@@ -15,6 +15,7 @@ const DEFAULTS = () => ({
   setupDone: false,
   autostart: false,
   obs: { url: "ws://127.0.0.1:4455", password: "", mic: "", autoReplay: true },
+  chatClips: true,
   voice: { enabled: false, lang: "", deviceId: "" },
   music: { enabled: true, sources: { spotify: true, apple: true, browser: true, other: false } },
   commands: [

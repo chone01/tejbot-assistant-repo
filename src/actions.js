@@ -27,6 +27,7 @@ function notify(title, body) {
 }
 
 let onClip = () => {};
+let chatClipAt = 0; // kdy přišel !clip z chatu (uložený záznam pak patří k němu)
 const pad = (n) => String(n).padStart(2, "0");
 
 /** OBS uložilo záznam -> přesuneme ho do složky s klipy, kterou si uživatel vybral */
@@ -53,7 +54,9 @@ async function handleReplay(saved) {
   notify(L("Klip uložen", "Clip saved"), final);
   onClip({ file: final, at: d.toISOString() });
   try {
-    await api.clip(path.basename(final), "");
+    const fromChat = Date.now() - chatClipAt < 30000;
+    chatClipAt = 0;
+    await api.clip(path.basename(final), "", fromChat);
   } catch {
     /* web je nedostupný, klip na disku zůstává */
   }
@@ -128,4 +131,4 @@ async function run(action, param) {
   }
 }
 
-module.exports = { ACTIONS, run, notify, setOnClip: (fn) => (onClip = fn) };
+module.exports = { ACTIONS, run, notify, markChatClip: () => (chatClipAt = Date.now()), setOnClip: (fn) => (onClip = fn) };

@@ -11,11 +11,13 @@ const api = require("./api");
 const obs = require("./obs");
 const media = require("./media");
 const actions = require("./actions");
+const live = require("./live");
 
 let win = null;
 let tray = null;
 let quitting = false;
 let premium = { active: false, until: null, lifetime: false };
+let liveInfo = null; // kam se připojit pro živé zprávy z chatu
 let webState = "unknown"; // ok | offline | unpaired | nopremium
 let lastClips = [];
 let hotkeyErrors = [];
@@ -126,6 +128,7 @@ async function refreshMe() {
         cfg.channel = r.data.channel;
         config.save();
         premium = r.data.premium;
+        liveInfo = r.data.live || null;
         webState = premium.active ? "ok" : "nopremium";
       } else if (webState === "unknown") webState = "offline";
     } catch {
@@ -133,6 +136,7 @@ async function refreshMe() {
     }
   }
   if (before !== webState) applyState();
+  applyLive();
   send("state", fullState());
 }
 
@@ -147,7 +151,21 @@ function applyState() {
     media.stop();
   }
   restartVoice();
+  applyLive();
 }
+
+function applyLive() {
+  live.start(enabled() && config.get().chatClips ? liveInfo : null);
+}
+let lastChatClip = 0;
+live.events.on("clip", async (p) => {
+  if (!enabled() || !config.get().chatClips || !obs.state().connected) return;
+  if (Date.now() - lastChatClip < 15000) return; // stejně jako bot: nejvýš jeden klip za 15 s
+  lastChatClip = Date.now();
+  actions.markChatClip();
+  const r = await actions.run("clip");
+  send("toast", { ok: r.ok, message: `!clip (${String(p.user || "chat").slice(0, 40)}): ${r.message}` });
+});
 
 function fullState() {
   const cfg = config.get();
@@ -398,6 +416,10 @@ handle("saveSettings", (patch) => {
       if (!cfg.music.enabled) void api.nowPlaying(null, true).catch(() => {});
     }
   }
+  if (typeof patch.chatClips === "boolean") {
+    cfg.chatClips = patch.chatClips;
+    applyLive();
+  }
   if (patch.voice) {
     const v = patch.voice;
     if (typeof v.enabled === "boolean") cfg.voice.enabled = v.enabled;
@@ -561,6 +583,7 @@ app.on("window-all-closed", () => {
 app.on("before-quit", () => {
   quitting = true;
   stopVoice();
+  live.stop();
   media.stop();
 });
 app.on("will-quit", () => globalShortcut.unregisterAll());

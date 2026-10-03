@@ -32,5 +32,5 @@ module.exports = {
   me: () => call("GET", "/api/assistant/me"),
   unpair: () => call("DELETE", "/api/assistant/me"),
   nowPlaying: (track, changed) => call("POST", "/api/assistant/now-playing", { ...(track || { title: "" }), changed }),
-  clip: (file, note) => call("POST", "/api/assistant/clip", { file, note }),
+  clip: (file, note, chat) => call("POST", "/api/assistant/clip", { file, note, chat: !!chat }),
 };
