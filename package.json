@@ -14,7 +14,8 @@
   },
   "dependencies": {
     "electron-updater": "^6.3.9",
-    "obs-websocket-js": "^5.0.6"
+    "obs-websocket-js": "^5.0.6",
+    "vosk-browser": "^0.0.8"
   },
   "devDependencies": {
     "electron": "^33.2.1",
@@ -23,10 +24,23 @@
   "build": {
     "appId": "eu.tejbot.assistent",
     "productName": "Tejbot Assistent",
-    "files": ["src/**", "assets/**"],
-    "asarUnpack": ["src/media-win.ps1"],
-    "publish": { "provider": "github", "owner": "chone01", "repo": "tejbot-assistant-repo" },
-    "win": { "target": "nsis", "icon": "assets/icon.ico", "artifactName": "Tejbot-Assistent-Setup.${ext}" },
+    "files": [
+      "src/**",
+      "assets/**"
+    ],
+    "asarUnpack": [
+      "src/media-win.ps1"
+    ],
+    "publish": {
+      "provider": "github",
+      "owner": "chone01",
+      "repo": "tejbot-assistant-repo"
+    },
+    "win": {
+      "target": "nsis",
+      "icon": "assets/icon.ico",
+      "artifactName": "Tejbot-Assistent-Setup.${ext}"
+    },
     "nsis": {
       "oneClick": false,
       "perMachine": false,
@@ -35,6 +49,20 @@
       "deleteAppDataOnUninstall": true,
       "shortcutName": "Tejbot Assistent"
     },
-    "linux": { "target": "AppImage", "icon": "assets/icon.png", "category": "AudioVideo", "artifactName": "Tejbot-Assistent.${ext}" }
+    "linux": {
+      "target": "AppImage",
+      "icon": "assets/icon.png",
+      "category": "AudioVideo",
+      "artifactName": "Tejbot-Assistent.${ext}"
+    },
+    "extraResources": [
+      {
+        "from": "models",
+        "to": "models",
+        "filter": [
+          "*.tar.gz"
+        ]
+      }
+    ]
   }
 }

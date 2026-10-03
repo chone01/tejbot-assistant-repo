@@ -15,6 +15,7 @@ const DEFAULTS = () => ({
   setupDone: false,
   autostart: false,
   obs: { url: "ws://127.0.0.1:4455", password: "", mic: "", autoReplay: true },
+  voice: { enabled: false, lang: "", deviceId: "" },
   music: { enabled: true, sources: { spotify: true, apple: true, browser: true, other: false } },
   commands: [
     { id: randomUUID(), name: "Udělej klip", phrase: "udělej klip", hotkey: "", action: "clip", param: "" },
@@ -57,7 +58,7 @@ function load() {
   } catch {
     /* první spuštění */
   }
-  cfg = { ...d, ...saved, obs: { ...d.obs, ...(saved.obs || {}) }, music: { ...d.music, ...(saved.music || {}), sources: { ...d.music.sources, ...((saved.music || {}).sources || {}) } } };
+  cfg = { ...d, ...saved, voice: { ...d.voice, ...(saved.voice || {}) }, obs: { ...d.obs, ...(saved.obs || {}) }, music: { ...d.music, ...(saved.music || {}), sources: { ...d.music.sources, ...((saved.music || {}).sources || {}) } } };
   if (!Array.isArray(cfg.commands)) cfg.commands = d.commands;
   for (const p of SECRET) setIn(cfg, p, dec(getIn(cfg, p)));
   return cfg;

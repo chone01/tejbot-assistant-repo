@@ -89,6 +89,7 @@ const TABS = () => [
   ["home", "🏠", t("Přehled", "Overview")],
   ["cmds", "⌨️", t("Příkazy", "Commands")],
   ["obs", "🎥", "OBS"],
+  ["voice", "🎙️", t("Hlas", "Voice")],
   ["music", "🎧", t("Hudba", "Music")],
   ["settings", "⚙️", t("Nastavení", "Settings")],
 ];
@@ -169,7 +170,7 @@ function tabCmds() {
         return `<div class="cmd">
         <div><label class="f">${t("Název", "Name")}</label><input type="text" data-cmd="${i}" data-k="name" value="${esc(c.name)}" maxlength="60" /></div>
         <div><label class="f">${t("Akce", "Action")}</label>${actionSelect(c, i)}${needsScene ? `<select style="margin-top:6px" data-cmd="${i}" data-k="param"><option value="">${t("– vyber scénu –", "– pick a scene –")}</option>${[...new Set([...lists.scenes, c.param].filter(Boolean))].map((s) => `<option ${s === c.param ? "selected" : ""}>${esc(s)}</option>`).join("")}</select>` : ""}</div>
-        <div><label class="f">${t("Věta pro hlas (brzy)", "Voice phrase (soon)")}</label><input type="text" data-cmd="${i}" data-k="phrase" value="${esc(c.phrase)}" maxlength="80" placeholder="${t("např. udělej klip", "e.g. make a clip")}" /></div>
+        <div><label class="f">${t("Věta pro hlas", "Voice phrase")}</label><input type="text" data-cmd="${i}" data-k="phrase" value="${esc(c.phrase)}" maxlength="80" placeholder="${t("např. udělej klip", "e.g. make a clip")}" /></div>
         <div><label class="f">${t("Klávesová zkratka", "Hotkey")}</label><input type="text" class="key" readonly data-key="${i}" value="${esc(c.hotkey)}" placeholder="${t("klikni a zmáčkni", "click and press")}" /></div>
         <div class="row"><button class="btn sm" data-test="${i}" title="${t("Vyzkoušet", "Test")}">▶</button><button class="btn sm danger" data-del="${i}" title="${t("Smazat", "Delete")}">✕</button></div>
         ${S.hotkeyErrors.includes(c.id) ? `<div class="err">⚠ ${t("Tuhle zkratku už používá jiný program, zvol jinou.", "Another program already uses this hotkey, pick a different one.")}</div>` : ""}
@@ -182,7 +183,7 @@ function tabCmds() {
       <button class="btn primary" id="savecmds">${t("Uložit příkazy", "Save commands")}</button>
     </div>
   </div>
-  <p class="muted small">${t("Zkratku smažeš klávesou Backspace. Hlasové ovládání přidáme v další verzi, věty si můžeš připravit už teď.", "Clear a hotkey with Backspace. Voice control arrives in the next version; you can prepare your phrases now.")}</p>`;
+  <p class="muted small">${t("Zkratku smažeš klávesou Backspace. Hlasové povely zapneš v záložce Hlas.", "Clear a hotkey with Backspace. Turn voice commands on in the Voice tab.")}</p>`;
 }
 
 function tabObs() {
@@ -218,6 +219,59 @@ function tabObs() {
     <label class="check"><input type="checkbox" id="autoreplay" ${o.autoReplay ? "checked" : ""} /><span>${t("Zapínat záznam do paměti automaticky, když se aplikace připojí k OBS", "Start the Replay Buffer automatically when the app connects to OBS")}</span></label>
     <label class="f" style="margin-top:8px">${t("Klipy se ukládají do", "Clips are saved to")}</label>
     <div class="row"><div class="path" style="flex:1">${esc(S.config.clipsDir)}</div><button class="btn" id="pickdir">📁 ${t("Změnit", "Change")}</button></div>
+  </div>`;
+}
+
+function voiceLabel() {
+  const v = S.voice;
+  const mic = /^mic/.test(v.error);
+  return {
+    off: ["", t("Vypnuto", "Off")],
+    loading: ["warn", t("Připravuji rozpoznávání… (poprvé to trvá až půl minuty)", "Preparing recognition… (the first time takes up to half a minute)")],
+    listening: ["ok", t("Poslouchám", "Listening")],
+    nophrases: ["warn", t("Žádný příkaz nemá větu pro hlas. Doplň ji v záložce Příkazy.", "No command has a voice phrase. Add one in the Commands tab.")],
+    error: ["bad", mic ? t("Nejde použít mikrofon. Zkontroluj ve Windows: Nastavení → Soukromí a zabezpečení → Mikrofon → povolit aplikacím pro stolní počítače.", "Can't use the microphone. Check Windows: Settings → Privacy & security → Microphone → allow desktop apps.") : /^model/.test(v.error) ? t("Chybí hlasový model pro tenhle jazyk.", "The voice model for this language is missing.") : t("Rozpoznávání spadlo. Vypni ho a zapni.", "Recognition crashed. Turn it off and on.")],
+  }[v.status] || ["", v.status];
+}
+const LANG_NAMES = { cs: "Čeština", en: "English" };
+function tabVoice() {
+  const v = S.voice;
+  const c = S.config.voice;
+  const [dot, label] = voiceLabel();
+  const withPhrase = S.config.commands.filter((x) => x.phrase);
+  const fresh = v.heard && Date.now() - v.heardAt < 60000;
+  return `<div class="head"><h1>${t("Hlasové povely", "Voice commands")}</h1><p class="muted">${t("Řekneš větu a aplikace udělá akci. Rozpoznávání běží jen v tvém počítači, hlas se nikam neposílá.", "Say a phrase and the app does the action. Recognition runs on your computer only; your voice is never sent anywhere.")}</p></div>
+  <div class="card">
+    <label class="check"><input type="checkbox" id="voiceon" ${c.enabled ? "checked" : ""} /><span><b>${t("Poslouchat hlasové povely", "Listen for voice commands")}</b></span></label>
+    <p style="margin-top:8px"><span class="dot ${dot}" style="display:inline-block;margin-right:8px"></span>${label}</p>
+    ${v.status === "error" && v.error ? `<p class="muted small" style="margin-top:4px">${t("Podrobnosti", "Details")}: ${esc(v.error)}</p>` : ""}
+    <div class="two" style="margin-top:14px">
+      <div><label class="f">${t("Mikrofon", "Microphone")}</label><select id="voicemic"><option value="">${t("Výchozí mikrofon systému", "System default microphone")}</option>${v.devices.filter((d) => d.id && d.id !== "default").map((d) => `<option value="${esc(d.id)}" ${d.id === c.deviceId ? "selected" : ""}>${esc(d.name)}</option>`).join("")}</select></div>
+      <div><label class="f">${t("Jazyk povelů", "Command language")}</label><select id="voicelang">${v.langs.map((l) => `<option value="${l}" ${l === v.lang ? "selected" : ""}>${LANG_NAMES[l] || l}</option>`).join("")}</select></div>
+    </div>
+    ${c.enabled && !v.devices.length ? "" : ""}
+  </div>
+  <div class="card">
+    <h2>${t("Co naposledy slyšel", "Last heard")}</h2>
+    <p>${fresh ? `<b>„${esc(v.heard)}“</b> ${v.heardHit ? `<span class="tag gold">${t("spuštěno", "triggered")}</span>` : `<span class="tag">${t("nejisté, nespuštěno", "unsure, not triggered")}</span>`}` : `<span class="muted">${t("Zatím nic. Zkus říct některou větu níže.", "Nothing yet. Try saying one of the phrases below.")}</span>`}</p>
+  </div>
+  <div class="card">
+    <div class="row sp"><h2>${t("Věty, na které slyší", "Phrases it listens for")}</h2><button class="btn sm" data-tab="cmds">${t("Upravit v Příkazech", "Edit in Commands")}</button></div>
+    ${
+      withPhrase.length
+        ? `<ul class="clips">${withPhrase.map((x) => `<li><span><b>„${esc(x.phrase)}“</b></span><span class="muted small">${esc(t((S.actions.find((a) => a.key === x.action) || {}).cs || "", (S.actions.find((a) => a.key === x.action) || {}).en || ""))}${x.param ? `: ${esc(x.param)}` : ""}</span></li>`).join("")}</ul>`
+        : `<p class="muted">${t("Žádná. V záložce Příkazy doplň u příkazu „Větu pro hlas“.", "None. Add a “Voice phrase” to a command in the Commands tab.")}</p>`
+    }
+    ${v.unknown.length ? `<p class="error">⚠ ${t("Tahle slova hlasový model nezná, věta s nimi nebude fungovat. Zkus jiné slovo:", "The voice model doesn't know these words, so phrases with them won't work. Try another word:")} <b>${v.unknown.map(esc).join(", ")}</b></p>` : ""}
+  </div>
+  <div class="card">
+    <h2>${t("Tipy", "Tips")}</h2>
+    <ol class="steps">
+      <li>${t("Delší věta je spolehlivější. „Počítači udělej klip“ se náhodou neřekne, samotné „klip“ ano.", "A longer phrase is more reliable. You won't say “computer make a clip” by accident, but “clip” you might.")}</li>
+      <li>${t("Model zná jen běžná slova. Vymyšlená slova a jména (třeba „Tejbot“) nezná, aplikace tě na ně upozorní.", "The model only knows common words. It doesn't know made-up words and names (like “Tejbot”); the app warns you about them.")}</li>
+      <li>${t("Piš věty běžnými slovy s háčky a čárkami, bez číslic (místo „2“ napiš „dva“).", "Write phrases in ordinary words, no digits (write “two” instead of “2”).")}</li>
+      <li>${t("Každá věta ať zní jinak. Dvě podobné věty si aplikace může splést.", "Make each phrase sound different. Two similar phrases can get mixed up.")}</li>
+    </ol>
   </div>`;
 }
 
@@ -293,7 +347,7 @@ function render() {
   if (S.web === "nopremium") return ($app.innerHTML = screenNoPremium()), bind();
   if (S.web === "offline" || S.web === "unknown") return ($app.innerHTML = screenOffline()), bind();
   if (!S.config.setupDone) return ($app.innerHTML = screenSetup()), bind();
-  const body = { home: tabHome, cmds: tabCmds, obs: tabObs, music: tabMusic, settings: tabSettings }[tab]();
+  const body = { home: tabHome, cmds: tabCmds, obs: tabObs, voice: tabVoice, music: tabMusic, settings: tabSettings }[tab]();
   const ch = S.config.channel;
   $app.innerHTML = `<aside class="side">
     <div class="logo"><img src="icon.png" alt="" /> Tejbot Assistent</div>
@@ -420,6 +474,11 @@ function bind() {
   });
   on("#mic", "change", async (el) => apply(await tb.call("saveSettings", { obs: { mic: el.value } })));
   on("#autoreplay", "change", async (el) => apply(await tb.call("saveSettings", { obs: { autoReplay: el.checked } })));
+
+  // hlas
+  on("#voiceon", "change", async (el) => apply(await tb.call("saveSettings", { voice: { enabled: el.checked } })));
+  on("#voicemic", "change", async (el) => apply(await tb.call("saveSettings", { voice: { deviceId: el.value } })));
+  on("#voicelang", "change", async (el) => apply(await tb.call("saveSettings", { voice: { lang: el.value } })));
 
   // hudba
   const saveMusic = async () => {

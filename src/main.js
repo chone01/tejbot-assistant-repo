@@ -1,5 +1,5 @@
 // Tejbot Assistent - hlavní část aplikace (ikona u hodin, okno, klávesové zkratky)
-const { app, BrowserWindow, Tray, Menu, ipcMain, dialog, globalShortcut, shell, nativeImage, protocol, net } = require("electron");
+const { app, BrowserWindow, Tray, Menu, ipcMain, dialog, globalShortcut, shell, nativeImage, protocol, net, session } = require("electron");
 const { pathToFileURL } = require("url");
 const path = require("path");
 const fs = require("fs");
@@ -146,6 +146,7 @@ function applyState() {
     obs.stop();
     media.stop();
   }
+  restartVoice();
 }
 
 function fullState() {
@@ -165,6 +166,7 @@ function fullState() {
     clips: lastClips,
     hotkeyErrors,
     update,
+    voice: { ...voice, langs: voiceLangs(), lang: voiceLang() },
   };
 }
 
@@ -251,14 +253,90 @@ function watchClips() {
 setInterval(() => win && !win.isDestroyed() && win.isVisible() && scanClips(), 15000);
 
 // videa z klipové složky pro náhled v okně (adresa tbclip://clip/<název>, nic jiného nepustí)
-protocol.registerSchemesAsPrivileged([{ scheme: "tbclip", privileges: { standard: true, secure: true, stream: true, supportFetchAPI: true } }]);
+protocol.registerSchemesAsPrivileged([
+  { scheme: "tbclip", privileges: { standard: true, secure: true, stream: true, supportFetchAPI: true } },
+  { scheme: "tbmodel", privileges: { standard: true, secure: true, supportFetchAPI: true, corsEnabled: true } },
+]);
 function registerClipProtocol() {
   protocol.handle("tbclip", (req) => {
     const name = path.basename(decodeURIComponent(new URL(req.url).pathname));
     if (!VIDEO.test(name)) return new Response("", { status: 404 });
     return net.fetch(pathToFileURL(path.join(config.get().clipsDir, name)).toString(), { headers: req.headers });
   });
+  // hlasové modely přibalené k aplikaci (tbmodel://model/cs.tar.gz)
+  protocol.handle("tbmodel", async (req) => {
+    const name = path.basename(new URL(req.url).pathname);
+    if (!/^[a-z]{2}\.tar\.gz$/.test(name)) return new Response("", { status: 404 });
+    try {
+      const data = await fs.promises.readFile(path.join(modelsDir(), name));
+      return new Response(data, { headers: { "Content-Type": "application/gzip", "Access-Control-Allow-Origin": "*" } });
+    } catch {
+      return new Response("", { status: 404 });
+    }
+  });
 }
+
+// ------------------------------------------------------------ hlasové povely
+// Poslouchá neviditelné okno (ui/voice.html). Tady se jen zapíná, vypíná a spouští akce.
+let voiceWin = null;
+let voice = { status: "off", error: "", heard: "", heardHit: false, heardAt: 0, devices: [], unknown: [] }; // off | loading | listening | nophrases | error
+const modelsDir = () => (app.isPackaged ? path.join(process.resourcesPath, "models") : path.join(__dirname, "..", "models"));
+function voiceLangs() {
+  try {
+    return fs.readdirSync(modelsDir()).filter((f) => /^[a-z]{2}\.tar\.gz$/.test(f)).map((f) => f.slice(0, 2));
+  } catch {
+    return [];
+  }
+}
+function voiceLang() {
+  const cfg = config.get();
+  const have = voiceLangs();
+  const want = cfg.voice.lang || cfg.lang;
+  return have.includes(want) ? want : have[0] || "";
+}
+const setVoice = (patch) => {
+  voice = { ...voice, ...patch };
+  send("state", fullState());
+};
+function stopVoice() {
+  if (voiceWin && !voiceWin.isDestroyed()) voiceWin.destroy();
+  voiceWin = null;
+}
+function restartVoice() {
+  stopVoice();
+  const cfg = config.get();
+  if (!enabled() || !cfg.voice.enabled) return setVoice({ status: "off", error: "", unknown: [] });
+  if (!voiceLang()) return setVoice({ status: "error", error: "model: missing", unknown: [] });
+  setVoice({ status: "loading", error: "", unknown: [] });
+  voiceWin = new BrowserWindow({
+    show: false,
+    width: 300,
+    height: 200,
+    webPreferences: { preload: path.join(__dirname, "preload.js"), contextIsolation: true, nodeIntegration: false, sandbox: true, backgroundThrottling: false },
+  });
+  const w = voiceWin;
+  // model hlásí slova, která nezná -> ukážeme je u příkazů
+  w.webContents.on("console-message", (_e, _level, message) => {
+    const m = /missing in vocabulary:?\s*'?([^'\s]+)'?/i.exec(String(message));
+    if (m && !voice.unknown.includes(m[1])) setVoice({ unknown: [...voice.unknown, m[1]] });
+  });
+  w.webContents.on("render-process-gone", () => voiceWin === w && setVoice({ status: "error", error: "crash" }));
+  w.loadFile(path.join(__dirname, "ui", "voice.html"));
+}
+const fromVoice = (name, fn) => ipcMain.handle(`tb:${name}`, (e, ...args) => (voiceWin && !voiceWin.isDestroyed() && e.sender === voiceWin.webContents ? fn(...args) : null));
+fromVoice("voiceConfig", () => {
+  const cfg = config.get();
+  return { lang: voiceLang(), deviceId: cfg.voice.deviceId, phrases: cfg.commands.map((c) => c.phrase).filter(Boolean) };
+});
+fromVoice("voiceStatus", (st) => setVoice({ status: String(st.status), error: String(st.error || "").slice(0, 200) }));
+fromVoice("voiceDevices", (list) => setVoice({ devices: (Array.isArray(list) ? list : []).slice(0, 20).map((d) => ({ id: String(d.id), name: String(d.name).slice(0, 80) })) }));
+fromVoice("voiceHeard", ({ text, hit, conf }) => {
+  setVoice({ heard: String(text).slice(0, 100), heardHit: !!hit, heardConf: Number(conf) || 0, heardAt: Date.now() });
+  if (!hit) return;
+  const norm = (s) => String(s || "").toLowerCase().replace(/[^\p{L}\p{N}\s]/gu, " ").replace(/\s+/g, " ").trim();
+  const c = config.get().commands.find((x) => norm(x.phrase) === text);
+  if (c) void runAction(c.action, c.param).then((r) => (!win || !win.isVisible()) && r.ok && r.message && actions.notify("Tejbot Assistent", r.message));
+});
 
 // ------------------------------------------------------------ příkazy z okna
 const handle = (name, fn) => ipcMain.handle(`tb:${name}`, (_e, ...args) => fn(...args));
@@ -320,6 +398,14 @@ handle("saveSettings", (patch) => {
       if (!cfg.music.enabled) void api.nowPlaying(null, true).catch(() => {});
     }
   }
+  if (patch.voice) {
+    const v = patch.voice;
+    if (typeof v.enabled === "boolean") cfg.voice.enabled = v.enabled;
+    if (typeof v.lang === "string") cfg.voice.lang = v.lang.slice(0, 2);
+    if (typeof v.deviceId === "string") cfg.voice.deviceId = v.deviceId.slice(0, 200);
+    config.save();
+    restartVoice();
+  }
   if (patch.obs) {
     const o = patch.obs;
     const reconnect = (typeof o.url === "string" && o.url !== cfg.obs.url) || typeof o.password === "string";
@@ -341,6 +427,7 @@ handle("saveCommands", (list) => {
     .map((c) => ({ id: s(c.id, 40) || randomUUID(), name: s(c.name, 60), phrase: s(c.phrase, 80).toLowerCase(), hotkey: s(c.hotkey, 40), action: c.action, param: s(c.param, 120) }));
   config.save();
   registerHotkeys();
+  restartVoice();
   return fullState();
 });
 handle("run", (action, param) => runAction(action, param));
@@ -457,6 +544,9 @@ handle("installUpdate", () => {
 // ------------------------------------------------------------ start
 app.whenReady().then(async () => {
   config.load();
+  // mikrofon smí jen vlastní okna aplikace (hlasové povely)
+  session.defaultSession.setPermissionRequestHandler((wc, permission, cb) => cb(permission === "media" && wc.getURL().startsWith("file:")));
+  session.defaultSession.setPermissionCheckHandler((wc, permission) => permission === "media" && !!wc && wc.getURL().startsWith("file:"));
   registerClipProtocol();
   scanClips();
   createWindow();
@@ -470,6 +560,7 @@ app.on("window-all-closed", () => {
 });
 app.on("before-quit", () => {
   quitting = true;
+  stopVoice();
   media.stop();
 });
 app.on("will-quit", () => globalShortcut.unregisterAll());

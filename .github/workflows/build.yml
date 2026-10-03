@@ -29,6 +29,21 @@ jobs:
       - name: Odkud se aplikace aktualizuje (tenhle repozitář)
         shell: bash
         run: node -e "const fs=require('fs');const p=JSON.parse(fs.readFileSync('package.json'));const [o,r]=process.env.GITHUB_REPOSITORY.split('/');p.build.publish={provider:'github',owner:o,repo:r};fs.writeFileSync('package.json',JSON.stringify(p,null,2))"
+      - name: Hlasové modely (čeština, angličtina) - přibalí se k aplikaci
+        shell: bash
+        run: |
+          mkdir -p models && cd models
+          for m in cs=vosk-model-small-cs-0.4-rhasspy en=vosk-model-small-en-us-0.15; do
+            lang="${m%%=*}"; name="${m#*=}"
+            if curl -fsSL --retry 3 -o m.zip "https://alphacephei.com/vosk/models/$name.zip" && unzip -q m.zip && tar -czf "$lang.tar.gz" "$name"; then
+              echo "Model $lang OK"
+            else
+              echo "::warning::Hlasovy model $lang se nepodarilo stahnout, aplikace bude bez nej"
+              rm -f "$lang.tar.gz"
+            fi
+            rm -rf m.zip "$name"
+          done
+          ls -la
       - run: npx electron-builder --publish never
       - uses: actions/upload-artifact@v4
         with:
