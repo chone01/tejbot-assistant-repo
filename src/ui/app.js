@@ -100,6 +100,24 @@ function obsLabel() {
   return ["warn", t("Nepřipojeno", "Not connected")];
 }
 
+const when = (ms) => new Date(ms).toLocaleString(S.config.lang === "en" ? "en-GB" : "cs-CZ", { day: "numeric", month: "numeric", hour: "2-digit", minute: "2-digit" });
+
+// přehrávač přes celé okno (je mimo #app, ať ho nezruší překreslení)
+const $player = document.getElementById("player");
+function closePlayer() {
+  $player.hidden = true;
+  $player.innerHTML = "";
+}
+function openPlayer(name) {
+  $player.innerHTML = `<div class="pbox"><div class="row sp" style="margin-bottom:10px"><b>${esc(name)}</b><span class="row"><button class="btn sm" id="pext">${t("Otevřít v přehrávači", "Open in player")}</button><button class="btn sm" id="pclose">✕ ${t("Zavřít", "Close")}</button></span></div><video src="tbclip://clip/${encodeURIComponent(name)}" controls autoplay></video><p class="error" id="perr" hidden>${t("Tenhle formát aplikace neumí přehrát (třeba MKV). Otevři ho tlačítkem „Otevřít v přehrávači“.", "The app can't play this format (e.g. MKV). Use “Open in player”.")}</p></div>`;
+  $player.hidden = false;
+  $player.querySelector("video").addEventListener("error", () => ($player.querySelector("#perr").hidden = false));
+  $player.querySelector("#pclose").addEventListener("click", closePlayer);
+  $player.querySelector("#pext").addEventListener("click", () => tb.call("openClip", name));
+}
+$player.addEventListener("click", (e) => e.target === $player && closePlayer());
+document.addEventListener("keydown", (e) => e.key === "Escape" && !$player.hidden && closePlayer());
+
 function tabHome() {
   const [oc, ol] = obsLabel();
   const tr = S.track;
@@ -121,10 +139,19 @@ function tabHome() {
     </div>
   </div>
   <div class="card">
-    <h2>${t("Poslední klipy", "Latest clips")}</h2>
+    <div class="row sp"><h2>${t("Moje klipy", "My clips")}</h2><button class="btn sm" data-run="open_clips">📁 ${t("Otevřít složku", "Open folder")}</button></div>
     ${
       S.clips.length
-        ? `<ul class="clips">${S.clips.map((c) => `<li><span>${esc(c.file.split(/[\\/]/).pop())}</span><button class="btn sm" data-show="${esc(c.file)}">${t("Ukázat ve složce", "Show in folder")}</button></li>`).join("")}</ul>`
+        ? `<div class="clipgrid">${S.clips
+            .map(
+              (c) => `<div class="clip">
+            <button class="thumb" data-play="${esc(c.name)}" title="${t("Přehrát", "Play")}"><video src="tbclip://clip/${encodeURIComponent(c.name)}#t=1" preload="metadata" muted tabindex="-1"></video><span class="play">▶</span></button>
+            <div class="cname" title="${esc(c.name)}">${esc(c.name)}</div>
+            <div class="row sp"><span class="muted small">${when(c.at)} · ${(c.size / 1048576).toFixed(1)} MB</span>
+            <span class="row" style="gap:4px"><button class="btn sm" data-show="${esc(c.name)}" title="${t("Ukázat ve složce", "Show in folder")}">📁</button><button class="btn sm danger" data-trash="${esc(c.name)}" title="${t("Smazat (do koše)", "Delete (to the bin)")}">🗑️</button></span></div>
+          </div>`
+            )
+            .join("")}</div>`
         : `<p class="muted">${t("Zatím žádný. Klipy se ukládají do:", "None yet. Clips are saved to:")}</p><div class="path" style="margin-top:8px">${esc(S.config.clipsDir)}</div>`
     }
   </div>`;
@@ -314,6 +341,12 @@ function bind() {
   on("[data-open]", "click", (el) => tb.call("openSite", el.dataset.open));
   on("[data-run]", "click", (el) => tb.call("run", el.dataset.run, ""));
   on("[data-show]", "click", (el) => tb.call("showClip", el.dataset.show));
+  on("[data-play]", "click", (el) => openPlayer(el.dataset.play));
+  on("[data-trash]", "click", async (el) => {
+    if (!confirm(t("Smazat tenhle klip? Přesune se do koše.", "Delete this clip? It moves to the bin."))) return;
+    const r = await tb.call("trashClip", el.dataset.trash);
+    if (!r.ok) toast(r);
+  });
   on("#refresh", "click", () => tb.call("refresh"));
   on("#lang", "click", async () => apply(await tb.call("saveSettings", { lang: S.config.lang === "en" ? "cs" : "en" })));
   on("#unpair", "click", async () => {

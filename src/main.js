@@ -1,5 +1,6 @@
 // Tejbot Assistent - hlavní část aplikace (ikona u hodin, okno, klávesové zkratky)
-const { app, BrowserWindow, Tray, Menu, ipcMain, dialog, globalShortcut, shell, nativeImage } = require("electron");
+const { app, BrowserWindow, Tray, Menu, ipcMain, dialog, globalShortcut, shell, nativeImage, protocol, net } = require("electron");
+const { pathToFileURL } = require("url");
 const path = require("path");
 const fs = require("fs");
 const os = require("os");
@@ -192,10 +193,72 @@ obs.events.on("state", (st) => {
   wasConnected = st.connected;
 });
 actions.setOnClip((c) => {
-  lastClips = [c, ...lastClips].slice(0, 10);
-  send("state", fullState());
+  scanClips();
   send("toast", { ok: true, message: `${L("Klip uložen", "Clip saved")}: ${path.basename(c.file)}` });
 });
+
+// ------------------------------------------------------------ klipy ve složce
+// Seznam klipů se čte přímo ze složky, takže smazaný soubor zmizí i z aplikace.
+const VIDEO = /\.(mp4|mkv|mov|m4v|webm|flv|ts)$/i;
+let watcher = null;
+let watched = "";
+let scanTimer = null;
+function scanClips() {
+  const dir = config.get().clipsDir;
+  let list = [];
+  try {
+    list = fs
+      .readdirSync(dir)
+      .filter((f) => VIDEO.test(f))
+      .map((f) => {
+        const st = fs.statSync(path.join(dir, f));
+        return { file: path.join(dir, f), name: f, size: st.size, at: st.mtimeMs };
+      })
+      .sort((a, b) => b.at - a.at)
+      .slice(0, 24);
+  } catch {
+    /* složka ještě neexistuje */
+  }
+  const changed = JSON.stringify(list) !== JSON.stringify(lastClips);
+  lastClips = list;
+  if (changed) send("state", fullState());
+  watchClips();
+}
+function watchClips() {
+  const dir = config.get().clipsDir;
+  if (watcher && watched === dir) return;
+  try {
+    if (watcher) watcher.close();
+  } catch {
+    /* nic */
+  }
+  watcher = null;
+  watched = dir;
+  try {
+    watcher = fs.watch(dir, () => {
+      clearTimeout(scanTimer);
+      scanTimer = setTimeout(scanClips, 400);
+    });
+    watcher.on("error", () => {
+      watcher = null;
+      watched = "";
+    });
+  } catch {
+    watched = ""; // složka neexistuje, zkusí se to při dalším čtení
+  }
+}
+// pojistka, kdyby systém změnu ve složce neohlásil
+setInterval(() => win && !win.isDestroyed() && win.isVisible() && scanClips(), 15000);
+
+// videa z klipové složky pro náhled v okně (adresa tbclip://clip/<název>, nic jiného nepustí)
+protocol.registerSchemesAsPrivileged([{ scheme: "tbclip", privileges: { standard: true, secure: true, stream: true, supportFetchAPI: true } }]);
+function registerClipProtocol() {
+  protocol.handle("tbclip", (req) => {
+    const name = path.basename(decodeURIComponent(new URL(req.url).pathname));
+    if (!VIDEO.test(name)) return new Response("", { status: 404 });
+    return net.fetch(pathToFileURL(path.join(config.get().clipsDir, name)).toString(), { headers: req.headers });
+  });
+}
 
 // ------------------------------------------------------------ příkazy z okna
 const handle = (name, fn) => ipcMain.handle(`tb:${name}`, (_e, ...args) => fn(...args));
@@ -235,6 +298,7 @@ handle("pickClipsDir", async () => {
   if (r.canceled || !r.filePaths[0]) return null;
   config.get().clipsDir = r.filePaths[0];
   config.save();
+  scanClips();
   return r.filePaths[0];
 });
 handle("finishSetup", () => {
@@ -289,7 +353,20 @@ handle("obsLists", async () => {
 });
 handle("obsReconnect", () => obs.reconnect());
 handle("openSite", (p) => shell.openExternal(`${api.SITE}${typeof p === "string" && p.startsWith("/") ? p : "/"}`));
-handle("showClip", (file) => shell.showItemInFolder(String(file)));
+// klipy: jen soubory ze složky s klipy (podle názvu), ať okno nemůže sáhnout jinam
+const clipPath = (name) => path.join(config.get().clipsDir, path.basename(String(name)));
+handle("showClip", (name) => shell.showItemInFolder(clipPath(name)));
+handle("openClip", (name) => shell.openPath(clipPath(name)));
+handle("trashClip", async (name) => {
+  try {
+    await shell.trashItem(clipPath(name)); // do koše, ne nenávratně
+  } catch {
+    return { ok: false, message: L("Klip se nepodařilo smazat. Není zrovna otevřený v přehrávači?", "Couldn't delete the clip. Is it open in a player?") };
+  }
+  scanClips();
+  return { ok: true };
+});
+handle("scanClips", () => scanClips());
 // Odinstalace: odpojí počítač na webu, zruší spouštění po startu, smaže nastavení a odstraní aplikaci.
 // Klipy (videa uživatele) se nemažou.
 handle("uninstall", async () => {
@@ -380,6 +457,8 @@ handle("installUpdate", () => {
 // ------------------------------------------------------------ start
 app.whenReady().then(async () => {
   config.load();
+  registerClipProtocol();
+  scanClips();
   createWindow();
   buildTray();
   await refreshMe();
