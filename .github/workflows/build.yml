@@ -1,0 +1,58 @@
+# Po každém nahrání změn (git push) GitHub sám sestaví instalátor pro Windows a Linux
+# a vystaví ho mezi "Releases". Web tejbot.eu/stahnout odkazuje vždy na ten nejnovější.
+name: Sestavit aplikaci
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [windows-latest, ubuntu-latest]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      # číslo verze roste s každým sestavením, aby se aplikace u uživatelů sama aktualizovala
+      - run: npm version 1.0.${{ github.run_number }} --no-git-tag-version --allow-same-version
+      - name: Odkud se aplikace aktualizuje (tenhle repozitář)
+        shell: bash
+        run: node -e "const fs=require('fs');const p=JSON.parse(fs.readFileSync('package.json'));const [o,r]=process.env.GITHUB_REPOSITORY.split('/');p.build.publish={provider:'github',owner:o,repo:r};fs.writeFileSync('package.json',JSON.stringify(p,null,2))"
+      - run: npx electron-builder --publish never
+      - uses: actions/upload-artifact@v4
+        with:
+          name: build-${{ matrix.os }}
+          if-no-files-found: error
+          path: |
+            dist/Tejbot-Assistent-Setup.exe
+            dist/Tejbot-Assistent-Setup.exe.blockmap
+            dist/Tejbot-Assistent.AppImage
+            dist/latest.yml
+            dist/latest-linux.yml
+
+  release:
+    needs: build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          path: out
+          merge-multiple: true
+      - uses: softprops/action-gh-release@v2
+        with:
+          tag_name: v1.0.${{ github.run_number }}
+          name: Tejbot Assistent 1.0.${{ github.run_number }}
+          body: Automaticky sestavená verze. Návod k instalaci je na https://tejbot.eu/stahnout
+          make_latest: "true"
+          files: out/*
