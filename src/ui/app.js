@@ -234,6 +234,11 @@ function tabSettings() {
     <h2>${t("Kanál", "Channel")}</h2>
     <div class="row sp"><span><b>${esc(S.config.channel.name)}</b> <span class="tag gold">Premium</span></span>
     <span class="row"><button class="btn" data-open="/dashboard/${esc(S.config.channel.id)}/assistant">${t("Otevřít web", "Open the website")}</button><button class="btn danger" id="unpair">${t("Odpojit aplikaci", "Disconnect the app")}</button></span></div>
+  </div>
+  <div class="card">
+    <h2>${t("Odinstalovat", "Uninstall")}</h2>
+    <p class="soft">${t("Odstraní aplikaci z počítače i s jejím nastavením a odpojí tenhle počítač od kanálu. Tvoje klipy zůstanou ve složce, kde jsou.", "Removes the app and its settings from this computer and disconnects it from the channel. Your clips stay in their folder.")}</p>
+    <div style="margin-top:12px"><button class="btn danger" id="uninstall">🗑️ ${t("Odinstalovat Tejbot Assistent", "Uninstall Tejbot Assistent")}</button></div>
   </div>`;
 }
 
@@ -376,6 +381,11 @@ function bind() {
   on("[data-src]", "change", saveMusic);
 
   // nastavení
+  on("#uninstall", "click", async () => {
+    if (!confirm(t("Opravdu odinstalovat Tejbot Assistent? Aplikace se zavře a smaže se i její nastavení. Klipy zůstanou.", "Really uninstall Tejbot Assistent? The app will close and its settings will be deleted. Clips stay."))) return;
+    const r = await tb.call("uninstall");
+    if (!r.ok) toast(r);
+  });
   on("#autostart", "change", async (el) => apply(await tb.call("saveSettings", { autostart: el.checked })));
   on("#langsel", "change", async (el) => apply(await tb.call("saveSettings", { lang: el.value })));
 }

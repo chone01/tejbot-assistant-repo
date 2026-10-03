@@ -32,6 +32,7 @@
       "perMachine": false,
       "allowToChangeInstallationDirectory": true,
       "createDesktopShortcut": true,
+      "deleteAppDataOnUninstall": true,
       "shortcutName": "Tejbot Assistent"
     },
     "linux": { "target": "AppImage", "icon": "assets/icon.png", "category": "AudioVideo", "artifactName": "Tejbot-Assistent.${ext}" }

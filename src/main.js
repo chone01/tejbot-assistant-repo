@@ -1,6 +1,9 @@
 // Tejbot Assistent - hlavní část aplikace (ikona u hodin, okno, klávesové zkratky)
 const { app, BrowserWindow, Tray, Menu, ipcMain, dialog, globalShortcut, shell, nativeImage } = require("electron");
 const path = require("path");
+const fs = require("fs");
+const os = require("os");
+const { spawn } = require("child_process");
 const { randomUUID } = require("crypto");
 const config = require("./config");
 const api = require("./api");
@@ -286,6 +289,46 @@ handle("obsLists", async () => {
 handle("obsReconnect", () => obs.reconnect());
 handle("openSite", (p) => shell.openExternal(`${api.SITE}${typeof p === "string" && p.startsWith("/") ? p : "/"}`));
 handle("showClip", (file) => shell.showItemInFolder(String(file)));
+// Odinstalace: odpojí počítač na webu, zruší spouštění po startu, smaže nastavení a odstraní aplikaci.
+// Klipy (videa uživatele) se nemažou.
+handle("uninstall", async () => {
+  if (!app.isPackaged) return { ok: false, message: L("Odinstalace funguje jen v nainstalované aplikaci.", "Uninstall only works in the installed app.") };
+  try {
+    await api.unpair();
+  } catch {
+    /* web nedostupný: počítač půjde odpojit na webu ručně */
+  }
+  globalShortcut.unregisterAll();
+  media.stop();
+  await obs.stop();
+  const userData = app.getPath("userData");
+  if (process.platform === "win32") {
+    try {
+      app.setLoginItemSettings({ openAtLogin: false });
+    } catch {
+      /* nebylo zapnuté */
+    }
+    const dir = path.dirname(process.execPath);
+    const un = fs.readdirSync(dir).find((f) => /^Uninstall .*\.exe$/i.test(f));
+    if (!un) return { ok: false, message: L("Nenašel jsem odinstalátor. Odinstaluj aplikaci ve Windows: Nastavení → Aplikace.", "Uninstaller not found. Remove the app in Windows: Settings → Apps.") };
+    const updater = path.join(process.env.LOCALAPPDATA || "", `${app.getName()}-updater`);
+    const updater2 = path.join(process.env.LOCALAPPDATA || "", "tejbot-assistent-updater");
+    // malý skript: počká, až se aplikace zavře, spustí odinstalátor a uklidí zbytky (i sám sebe)
+    const script = path.join(os.tmpdir(), `tejbot-uninstall-${Date.now()}.cmd`);
+    fs.writeFileSync(
+      script,
+      ["@echo off", "ping -n 4 127.0.0.1 >nul", `start "" /wait "${path.join(dir, un)}" /S`, "ping -n 9 127.0.0.1 >nul", `rmdir /s /q "${userData}"`, `rmdir /s /q "${updater}"`, `rmdir /s /q "${updater2}"`, '(goto) 2>nul & del "%~f0"', ""].join("\r\n")
+    );
+    spawn("cmd.exe", ["/c", script], { detached: true, stdio: "ignore", windowsHide: true, cwd: os.tmpdir() }).unref();
+  } else {
+    const rm = [userData, path.join(os.homedir(), ".config", "autostart", "tejbot-assistent.desktop")];
+    if (process.env.APPIMAGE) rm.push(process.env.APPIMAGE);
+    spawn("sh", ["-c", `sleep 3; ${rm.map((f) => `rm -rf "${f}"`).join("; ")}`], { detached: true, stdio: "ignore" }).unref();
+  }
+  quitting = true;
+  setTimeout(() => app.quit(), 300);
+  return { ok: true };
+});
 // při nastavování zkratky je potřeba ostatní zkratky na chvíli vypnout, jinak by se rovnou spustily
 handle("hotkeysPause", (pause) => (pause ? globalShortcut.unregisterAll() : registerHotkeys()));
 
