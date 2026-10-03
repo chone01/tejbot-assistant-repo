@@ -187,8 +187,8 @@ function tabObs() {
   </div>
   <div class="card">
     <h2>${t("Klipy", "Clips")}</h2>
-    <p class="soft">${t("Klip je posledních pár vteřin, které OBS drží v paměti (Replay Buffer). Délku nastavíš v OBS: Nastavení → Výstup → Replay Buffer → zaškrtni „Povolit“ a zvol třeba 30 s.", "A clip is the last few seconds OBS keeps in memory (Replay Buffer). Set the length in OBS: Settings → Output → Replay Buffer → tick “Enable” and choose e.g. 30 s.")}</p>
-    <label class="check"><input type="checkbox" id="autoreplay" ${o.autoReplay ? "checked" : ""} /><span>${t("Zapínat Replay Buffer automaticky, když se aplikace připojí k OBS", "Start the Replay Buffer automatically when the app connects to OBS")}</span></label>
+    <p class="soft">${t("Klip je posledních pár vteřin, které OBS drží v paměti (v OBS se to jmenuje „Záznam do paměti“). Délku nastavíš v OBS: Nastavení → Výstup → Záznam do paměti → zaškrtni „Povolit záznam do paměti“ a zvol třeba 30 s.", "A clip is the last few seconds OBS keeps in memory (Replay Buffer). Set the length in OBS: Settings → Output → Replay Buffer → tick “Enable” and choose e.g. 30 s.")}</p>
+    <label class="check"><input type="checkbox" id="autoreplay" ${o.autoReplay ? "checked" : ""} /><span>${t("Zapínat záznam do paměti automaticky, když se aplikace připojí k OBS", "Start the Replay Buffer automatically when the app connects to OBS")}</span></label>
     <label class="f" style="margin-top:8px">${t("Klipy se ukládají do", "Clips are saved to")}</label>
     <div class="row"><div class="path" style="flex:1">${esc(S.config.clipsDir)}</div><button class="btn" id="pickdir">📁 ${t("Změnit", "Change")}</button></div>
   </div>`;

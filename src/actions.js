@@ -13,7 +13,7 @@ const ACTIONS = [
   { key: "mic_unmute", cs: "Mikrofon: zapnout", en: "Microphone: unmute" },
   { key: "scene", cs: "Přepnout scénu", en: "Switch scene", param: "scene" },
   { key: "record_toggle", cs: "Nahrávání: spustit / zastavit", en: "Recording: start / stop" },
-  { key: "replay_toggle", cs: "Replay Buffer: zapnout / vypnout", en: "Replay Buffer: on / off" },
+  { key: "replay_toggle", cs: "Záznam do paměti: zapnout / vypnout", en: "Replay Buffer: on / off" },
   { key: "open_clips", cs: "Otevřít složku s klipy", en: "Open the clips folder" },
 ];
 
@@ -73,10 +73,10 @@ async function mic(mode) {
 
 async function clip() {
   const st = await obs.call("GetReplayBufferStatus").catch(() => null);
-  if (!st) throw new Error(L("V OBS není zapnutý Replay Buffer. Zapni ho v OBS: Nastavení → Výstup → Replay Buffer.", "Replay Buffer isn't enabled in OBS. Turn it on in OBS: Settings → Output → Replay Buffer."));
+  if (!st) throw new Error(L("V OBS není povolený záznam do paměti. Zapni ho v OBS: Nastavení → Výstup → Záznam do paměti.", "Replay Buffer isn't enabled in OBS. Turn it on in OBS: Settings → Output → Replay Buffer."));
   if (!st.outputActive) {
     await obs.call("StartReplayBuffer");
-    return L("Replay Buffer byl vypnutý, teď jsem ho zapnul. Klip půjde uložit za pár vteřin.", "Replay Buffer was off, I just turned it on. You can save a clip in a few seconds.");
+    return L("Záznam do paměti byl vypnutý, teď jsem ho zapnul. Klip půjde uložit za pár vteřin.", "Replay Buffer was off, I just turned it on. You can save a clip in a few seconds.");
   }
   await obs.call("SaveReplayBuffer");
   return L("Ukládám klip…", "Saving the clip…");
@@ -111,7 +111,7 @@ async function run(action, param) {
       }
       case "replay_toggle": {
         const r = await obs.call("ToggleReplayBuffer");
-        message = r.outputActive ? L("Replay Buffer zapnutý", "Replay Buffer on") : L("Replay Buffer vypnutý", "Replay Buffer off");
+        message = r.outputActive ? L("Záznam do paměti zapnutý", "Replay Buffer on") : L("Záznam do paměti vypnutý", "Replay Buffer off");
         break;
       }
       case "open_clips":
