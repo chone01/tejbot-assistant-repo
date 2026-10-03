@@ -6,46 +6,69 @@ const config = require("./config");
 const obs = new OBSWebSocket();
 const events = new EventEmitter();
 let connected = false;
-let connecting = false;
+let busy = false; // právě se zkouší připojit
 let lastError = "";
+let detail = ""; // přesná chyba od OBS (ukáže se v aplikaci, ať se dá poznat, co je špatně)
 let timer = null;
-let stopped = false;
+let stopped = true;
+let run = 0; // číslo pokusu: starší pokus už nesmí nic přepsat
 
-function setState(ok, err = "") {
-  const changed = connected !== ok || lastError !== err;
-  connected = ok;
-  lastError = err;
-  if (changed) events.emit("state", state());
+const state = () => ({ connected, connecting: busy && !connected, error: lastError, detail });
+const emit = () => events.emit("state", state());
+
+const withTimeout = (p, ms) => Promise.race([p, new Promise((_, no) => setTimeout(() => no(new Error("OBS neodpovídá (vypršel čas)")), ms))]);
+
+/** Adresy, které se zkusí: zadaná a k ní druhý zápis téhož počítače (některé Windows poslouchají jen na jednom) */
+function candidates(url) {
+  const list = [url];
+  if (url.includes("127.0.0.1")) list.push(url.replace("127.0.0.1", "localhost"), url.replace("127.0.0.1", "[::1]"));
+  else if (url.includes("localhost")) list.push(url.replace("localhost", "127.0.0.1"));
+  return list;
 }
-const state = () => ({ connected, error: lastError });
 
 async function connect() {
-  if (connecting || stopped) return;
-  connecting = true;
+  if (stopped) return;
+  const my = ++run;
   clearTimeout(timer);
+  busy = true;
+  emit();
   const { url, password, autoReplay } = config.get().obs;
-  try {
+  let err = null;
+  for (const u of candidates(url)) {
     try {
-      await obs.disconnect();
-    } catch {
-      /* nebylo připojeno */
+      await obs.disconnect().catch(() => {});
+      if (my !== run) return;
+      await withTimeout(obs.connect(u, password || undefined), 8000);
+      if (my !== run) return;
+      err = null;
+      break;
+    } catch (e) {
+      if (my !== run) return;
+      err = e;
+      if (e && e.code === 4009) break; // špatné heslo: jiná adresa nepomůže
     }
-    await obs.connect(url, password || undefined);
-    setState(true);
-    if (autoReplay) {
-      try {
-        const r = await obs.call("GetReplayBufferStatus");
-        if (!r.outputActive) await obs.call("StartReplayBuffer");
-      } catch {
-        /* Replay Buffer není v OBS zapnutý v nastavení */
-      }
-    }
-  } catch (e) {
-    // 4009 = špatné heslo
-    setState(false, e && e.code === 4009 ? "password" : "offline");
+  }
+  busy = false;
+  if (err) {
+    const noPw = !password && /authentication|4009/i.test(String(err.message));
+    connected = false;
+    lastError = err.code === 4009 || noPw ? "password" : "offline";
+    detail = `${err.code ? `${err.code}: ` : ""}${err.message || err}`.slice(0, 200);
+    emit();
     schedule();
-  } finally {
-    connecting = false;
+    return;
+  }
+  connected = true;
+  lastError = "";
+  detail = "";
+  emit();
+  if (autoReplay) {
+    try {
+      const r = await obs.call("GetReplayBufferStatus");
+      if (!r.outputActive) await obs.call("StartReplayBuffer");
+    } catch {
+      /* Replay Buffer není v OBS zapnutý v nastavení */
+    }
   }
 }
 function schedule() {
@@ -53,7 +76,12 @@ function schedule() {
   if (!stopped) timer = setTimeout(connect, 5000);
 }
 obs.on("ConnectionClosed", () => {
-  if (connected) setState(false, "offline");
+  if (busy) return; // zavření během připojování řeší connect()
+  if (connected) {
+    connected = false;
+    lastError = "offline";
+    emit();
+  }
   schedule();
 });
 obs.on("ReplayBufferSaved", (d) => events.emit("replay", d.savedReplayPath));
@@ -68,22 +96,26 @@ module.exports = {
   state,
   call,
   start: () => {
+    if (!stopped) return;
     stopped = false;
     connect();
   },
   stop: async () => {
     stopped = true;
+    run++;
+    busy = false;
     clearTimeout(timer);
     try {
       await obs.disconnect();
     } catch {
       /* nic */
     }
-    setState(false);
+    connected = false;
+    lastError = "";
+    emit();
   },
   reconnect: () => {
     stopped = false;
-    connecting = false;
     return connect();
   },
   /** seznam zvukových vstupů a scén pro výběr v nastavení */

@@ -181,7 +181,12 @@ media.events.on("track", () => {
 // jednou za minutu dá webu vědět, že aplikace pořád běží (jinak widget skladbu schová)
 setInterval(() => media.current() && Date.now() - lastSent > 55000 && void sendTrack(false), 15000);
 
-obs.events.on("state", () => send("state", fullState()));
+let wasConnected = false;
+obs.events.on("state", (st) => {
+  send("state", fullState());
+  if (st.connected && !wasConnected) send("toast", { ok: true, message: L("OBS připojeno.", "OBS connected.") });
+  wasConnected = st.connected;
+});
 actions.setOnClip((c) => {
   lastClips = [c, ...lastClips].slice(0, 10);
   send("state", fullState());
@@ -254,7 +259,6 @@ handle("saveSettings", (patch) => {
     if (typeof o.password === "string") cfg.obs.password = o.password;
     if (typeof o.mic === "string") cfg.obs.mic = o.mic;
     if (typeof o.autoReplay === "boolean") cfg.obs.autoReplay = o.autoReplay;
-    if (reconnect && enabled()) void obs.reconnect();
   }
   config.save();
   buildTray();

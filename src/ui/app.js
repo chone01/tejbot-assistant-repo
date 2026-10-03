@@ -95,6 +95,7 @@ const TABS = () => [
 
 function obsLabel() {
   if (S.obs.connected) return ["ok", t("Připojeno", "Connected")];
+  if (S.obs.connecting) return ["warn", t("Připojuji…", "Connecting…")];
   if (S.obs.error === "password") return ["bad", t("Špatné heslo", "Wrong password")];
   return ["warn", t("Nepřipojeno", "Not connected")];
 }
@@ -163,6 +164,9 @@ function tabObs() {
   return `<div class="head"><h1>OBS</h1><p class="muted">${t("Aplikace ovládá tvoje OBS přes vestavěný WebSocket server (OBS 28 a novější).", "The app controls your OBS through its built-in WebSocket server (OBS 28 or newer).")}</p></div>
   <div class="card">
     <div class="row sp"><h2 style="margin:0"><span class="dot ${oc}" style="display:inline-block;margin-right:8px"></span>${ol}</h2><button class="btn sm" id="obsre">${t("Připojit znovu", "Reconnect")}</button></div>
+    ${!S.obs.connected && !S.obs.connecting && S.obs.error === "password" ? `<p class="error">${S.hasObsPassword ? t("OBS heslo odmítlo. Zkopíruj ho v OBS znovu (Zobrazit informace o připojení → Kopírovat) a vlož sem.", "OBS rejected the password. Copy it again in OBS (Show Connect Info → Copy) and paste it here.") : t("OBS chce heslo. Vlož ho níže.", "OBS wants a password. Paste it below.")}</p>` : ""}
+    ${!S.obs.connected && !S.obs.connecting && S.obs.error === "offline" ? `<p class="error">${t("K OBS se nejde připojit. Běží OBS a je v něm zapnutý WebSocket server?", "Can't connect to OBS. Is OBS running with the WebSocket server enabled?")}</p>` : ""}
+    ${!S.obs.connected && S.obs.detail ? `<p class="muted small" style="margin-top:4px">${t("Podrobnosti", "Details")}: ${esc(S.obs.detail)}</p>` : ""}
     <ol class="steps">
       <li>${t("V OBS nahoře klikni na Nástroje → Nastavení WebSocket serveru.", "In OBS click Tools → WebSocket Server Settings.")}</li>
       <li>${t("Zaškrtni „Povolit WebSocket server“.", "Tick “Enable WebSocket server”.")}</li>
@@ -356,6 +360,7 @@ function bind() {
   on("#saveobs", "click", async () => {
     const pw = document.getElementById("obspw").value;
     apply(await tb.call("saveSettings", { obs: { url: document.getElementById("obsurl").value, ...(pw ? { password: pw } : {}) } }));
+    toast({ ok: true, message: pw ? t("Heslo uloženo, připojuji se k OBS…", "Password saved, connecting to OBS…") : t("Uloženo, připojuji se k OBS…", "Saved, connecting to OBS…") });
     tb.call("obsReconnect");
   });
   on("#mic", "change", async (el) => apply(await tb.call("saveSettings", { obs: { mic: el.value } })));
