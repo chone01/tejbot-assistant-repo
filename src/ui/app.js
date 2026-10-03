@@ -228,7 +228,24 @@ function tabSettings() {
     <h2>${t("Aplikace", "App")}</h2>
     <label class="check"><input type="checkbox" id="autostart" ${S.config.autostart ? "checked" : ""} /><span>${t("Spouštět po zapnutí počítače (schovaná u hodin)", "Start when the computer starts (hidden in the tray)")}</span></label>
     <div class="field" style="margin-top:8px;max-width:240px"><label class="f">${t("Jazyk", "Language")}</label><select id="langsel"><option value="cs" ${S.config.lang === "cs" ? "selected" : ""}>Čeština</option><option value="en" ${S.config.lang === "en" ? "selected" : ""}>English</option></select></div>
-    <p class="muted small">${t("Verze", "Version")} ${esc(S.version)} · ${t("aktualizuje se sama", "updates itself")}</p>
+    <div class="row" style="margin-top:6px">
+      <span>${t("Verze", "Version")} <b>${esc(S.version)}</b></span>
+      ${
+        S.update.status === "ready"
+          ? `<button class="btn primary" id="installupdate">⬆️ ${t("Nainstalovat verzi", "Install version")} ${esc(S.update.version)}</button>`
+          : `<button class="btn" id="checkupdate" ${S.update.status === "checking" || S.update.status === "downloading" ? "disabled" : ""}>🔄 ${t("Zkontrolovat aktualizace", "Check for updates")}</button>`
+      }
+    </div>
+    <p class="${S.update.status === "error" ? "error" : "muted small"}" style="margin-top:8px">${
+      {
+        idle: t("Aplikace se aktualizuje i sama, při spuštění a pak každých 6 hodin.", "The app also updates itself, on launch and then every 6 hours."),
+        checking: t("Hledám novou verzi…", "Looking for a new version…"),
+        none: t("Máš nejnovější verzi.", "You have the latest version."),
+        downloading: `${t("Stahuji verzi", "Downloading version")} ${esc(S.update.version)}… ${S.update.percent} %`,
+        ready: t("Nová verze je stažená. Aplikace se při instalaci na chvilku zavře a sama znovu spustí.", "The new version is downloaded. The app closes briefly during install and restarts itself."),
+        error: `${t("Aktualizace se nepovedla", "Update failed")}: ${esc(S.update.error)}`,
+      }[S.update.status]
+    }</p>
   </div>
   <div class="card">
     <h2>${t("Kanál", "Channel")}</h2>
@@ -381,6 +398,8 @@ function bind() {
   on("[data-src]", "change", saveMusic);
 
   // nastavení
+  on("#checkupdate", "click", () => tb.call("checkUpdate"));
+  on("#installupdate", "click", () => tb.call("installUpdate"));
   on("#uninstall", "click", async () => {
     if (!confirm(t("Opravdu odinstalovat Tejbot Assistent? Aplikace se zavře a smaže se i její nastavení. Klipy zůstanou.", "Really uninstall Tejbot Assistent? The app will close and its settings will be deleted. Clips stay."))) return;
     const r = await tb.call("uninstall");

@@ -163,6 +163,7 @@ function fullState() {
     actions: actions.ACTIONS,
     clips: lastClips,
     hotkeyErrors,
+    update,
   };
 }
 
@@ -332,6 +333,50 @@ handle("uninstall", async () => {
 // při nastavování zkratky je potřeba ostatní zkratky na chvíli vypnout, jinak by se rovnou spustily
 handle("hotkeysPause", (pause) => (pause ? globalShortcut.unregisterAll() : registerHotkeys()));
 
+// ------------------------------------------------------------ aktualizace
+let updater = null;
+let update = { status: "idle", version: "", percent: 0, error: "" }; // idle | checking | none | downloading | ready | error
+const setUpdate = (patch) => {
+  update = { ...update, ...patch };
+  send("state", fullState());
+};
+function setupUpdater() {
+  if (!app.isPackaged) return;
+  try {
+    updater = require("electron-updater").autoUpdater;
+    updater.autoDownload = true;
+    updater.autoInstallOnAppQuit = true;
+    updater.on("checking-for-update", () => setUpdate({ status: "checking", error: "" }));
+    updater.on("update-not-available", () => setUpdate({ status: "none" }));
+    updater.on("update-available", (i) => setUpdate({ status: "downloading", version: i.version, percent: 0 }));
+    updater.on("download-progress", (p) => setUpdate({ status: "downloading", percent: Math.round(p.percent || 0) }));
+    updater.on("update-downloaded", (i) => {
+      setUpdate({ status: "ready", version: i.version, percent: 100 });
+      send("toast", { ok: true, message: L("Nová verze je stažená. Nainstaluješ ji v Nastavení.", "A new version is downloaded. Install it in Settings.") });
+    });
+    updater.on("error", (e) => setUpdate({ status: "error", error: String((e && e.message) || e).split("\n")[0].slice(0, 200) }));
+    updater.checkForUpdates().catch(() => {});
+    setInterval(() => update.status !== "ready" && update.status !== "downloading" && updater.checkForUpdates().catch(() => {}), 6 * 60 * 60 * 1000);
+  } catch {
+    updater = null;
+  }
+}
+handle("checkUpdate", async () => {
+  if (!updater) return setUpdate({ status: "error", error: L("Aktualizace fungují jen v nainstalované aplikaci.", "Updates only work in the installed app.") });
+  if (update.status === "downloading" || update.status === "ready") return;
+  setUpdate({ status: "checking", error: "" });
+  try {
+    await updater.checkForUpdates();
+  } catch {
+    /* chybu ukáže událost "error" */
+  }
+});
+handle("installUpdate", () => {
+  if (!updater || update.status !== "ready") return;
+  quitting = true;
+  updater.quitAndInstall(true, true); // tiše nainstaluje a aplikaci znovu spustí
+});
+
 // ------------------------------------------------------------ start
 app.whenReady().then(async () => {
   config.load();
@@ -339,17 +384,7 @@ app.whenReady().then(async () => {
   buildTray();
   await refreshMe();
   setInterval(refreshMe, 10 * 60 * 1000);
-  if (app.isPackaged) {
-    try {
-      const { autoUpdater } = require("electron-updater");
-      autoUpdater.on("update-downloaded", () => send("toast", { ok: true, message: L("Nová verze je stažená. Nainstaluje se po ukončení aplikace.", "A new version is downloaded. It installs when you quit the app.") }));
-      autoUpdater.on("error", () => {});
-      autoUpdater.checkForUpdates().catch(() => {});
-      setInterval(() => autoUpdater.checkForUpdates().catch(() => {}), 6 * 60 * 60 * 1000);
-    } catch {
-      /* bez aktualizací */
-    }
-  }
+  setupUpdater();
 });
 app.on("window-all-closed", () => {
   /* běží dál u hodin */
