@@ -13,7 +13,6 @@
     "dist": "electron-builder --publish never"
   },
   "dependencies": {
-    "@supabase/supabase-js": "^2.117.2",
     "electron-updater": "^6.3.9",
     "obs-websocket-js": "^5.0.6",
     "vosk-browser": "^0.0.8"
