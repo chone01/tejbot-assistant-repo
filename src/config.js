@@ -15,7 +15,7 @@ const DEFAULTS = () => ({
   setupDone: false,
   autostart: false,
   obs: { url: "ws://127.0.0.1:4455", password: "", mic: "", autoReplay: true },
-  voice: { enabled: false, lang: "", deviceId: "" },
+  voice: { enabled: false, lang: "", deviceId: "", wake: true, wakeWord: "tejbot", gain: 1, strict: 75 },
   music: { enabled: true, sources: { spotify: true, apple: true, browser: true, other: false } },
   commands: [
     { id: randomUUID(), name: "Udělej klip", phrase: "udělej klip", hotkey: "", action: "clip", param: "" },

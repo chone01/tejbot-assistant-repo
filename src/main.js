@@ -279,7 +279,7 @@ function registerClipProtocol() {
 // ------------------------------------------------------------ hlasové povely
 // Poslouchá neviditelné okno (ui/voice.html). Tady se jen zapíná, vypíná a spouští akce.
 let voiceWin = null;
-let voice = { status: "off", error: "", heard: "", heardHit: false, heardAt: 0, devices: [], unknown: [] }; // off | loading | listening | nophrases | error
+let voice = { status: "off", error: "", heard: "", heardHit: false, heardAt: 0, devices: [], unknown: [], allUnknown: [], wakes: [], test: false, log: [], calib: "" }; // off | loading | listening | nophrases | error
 const modelsDir = () => (app.isPackaged ? path.join(process.resourcesPath, "models") : path.join(__dirname, "..", "models"));
 function voiceLangs() {
   try {
@@ -305,9 +305,9 @@ function stopVoice() {
 function restartVoice() {
   stopVoice();
   const cfg = config.get();
-  if (!enabled() || !cfg.voice.enabled) return setVoice({ status: "off", error: "", unknown: [] });
-  if (!voiceLang()) return setVoice({ status: "error", error: "model: missing", unknown: [] });
-  setVoice({ status: "loading", error: "", unknown: [] });
+  if (!enabled() || !cfg.voice.enabled) return setVoice({ status: "off", error: "", unknown: [], allUnknown: [], wakes: [], calib: "" });
+  if (!voiceLang()) return setVoice({ status: "error", error: "model: missing", unknown: [], allUnknown: [], wakes: [] });
+  setVoice({ status: "loading", error: "", unknown: [], allUnknown: [], wakes: [], calib: "" });
   voiceWin = new BrowserWindow({
     show: false,
     width: 300,
@@ -318,21 +318,48 @@ function restartVoice() {
   // model hlásí slova, která nezná -> ukážeme je u příkazů
   w.webContents.on("console-message", (_e, _level, message) => {
     const m = /missing in vocabulary:?\s*'?([^'\s]+)'?/i.exec(String(message));
-    if (m && !voice.unknown.includes(m[1])) setVoice({ unknown: [...voice.unknown, m[1]] });
+    if (!m || voice.allUnknown.includes(m[1])) return;
+    voice.allUnknown = [...voice.allUnknown, m[1]];
+    // varování ukážeme jen u slov z příkazů a z vlastního oslovení (vestavěné podoby "Tejbot" se zkouší potichu)
+    const c = config.get();
+    const mine = [...c.commands.map((x) => x.phrase), isDefaultWake(c.voice.wakeWord) ? "" : c.voice.wakeWord].join(" ").toLowerCase().split(/\s+/);
+    if (mine.includes(m[1].toLowerCase())) setVoice({ unknown: [...voice.unknown, m[1]] });
   });
   w.webContents.on("render-process-gone", () => voiceWin === w && setVoice({ status: "error", error: "crash" }));
   w.loadFile(path.join(__dirname, "ui", "voice.html"));
 }
 const fromVoice = (name, fn) => ipcMain.handle(`tb:${name}`, (e, ...args) => (voiceWin && !voiceWin.isDestroyed() && e.sender === voiceWin.webContents ? fn(...args) : null));
+// "Tejbot" hlasové modely neznají, proto zkoušíme podoby, které znějí stejně (model vybere tu nejbližší).
+const WAKES = {
+  cs: ["tejbot", "tej bot", "tejbote", "tajbot", "tý bot", "ty bot", "ten bot", "tedy bot", "tý bod", "ty bod", "ten bod", "tedy bod"],
+  en: ["tejbot", "tay bot", "they bot", "day bot", "take bot", "tape bot", "hey bot"],
+};
+const isDefaultWake = (w) => !String(w || "").trim() || /^tej\s?bot$/i.test(String(w).trim());
+function wakeList() {
+  const v = config.get().voice;
+  if (v.wake === false) return [];
+  return isDefaultWake(v.wakeWord) ? WAKES[voiceLang()] || ["tejbot"] : [String(v.wakeWord).toLowerCase()];
+}
 fromVoice("voiceConfig", () => {
   const cfg = config.get();
-  return { lang: voiceLang(), deviceId: cfg.voice.deviceId, phrases: cfg.commands.map((c) => c.phrase).filter(Boolean) };
+  return { lang: voiceLang(), deviceId: cfg.voice.deviceId, phrases: cfg.commands.map((c) => c.phrase).filter(Boolean), wakes: wakeList(), gain: Number(cfg.voice.gain) || 1, minConf: (Number(cfg.voice.strict) || 75) / 100 };
+});
+fromVoice("voiceUnknown", () => voice.allUnknown);
+fromVoice("voiceWakes", (list) => setVoice({ wakes: (Array.isArray(list) ? list : []).map(String).slice(0, 20) }));
+fromVoice("voiceLevel", (n) => void send("level", Number(n) || 0));
+fromVoice("voiceCalibrated", (r) => {
+  if (r && r.ok) {
+    config.get().voice.gain = Math.min(8, Math.max(0.3, Number(r.gain) || 1));
+    config.save();
+  }
+  setVoice({ calib: r && r.ok ? "ok" : "silent" });
 });
 fromVoice("voiceStatus", (st) => setVoice({ status: String(st.status), error: String(st.error || "").slice(0, 200) }));
 fromVoice("voiceDevices", (list) => setVoice({ devices: (Array.isArray(list) ? list : []).slice(0, 20).map((d) => ({ id: String(d.id), name: String(d.name).slice(0, 80) })) }));
-fromVoice("voiceHeard", ({ text, hit, conf }) => {
-  setVoice({ heard: String(text).slice(0, 100), heardHit: !!hit, heardConf: Number(conf) || 0, heardAt: Date.now() });
-  if (!hit) return;
+fromVoice("voiceHeard", ({ text, hit, conf, wake, reason }) => {
+  const item = { text: String(text || "").slice(0, 100), wake: !!wake, hit: !!hit, conf: Number(conf) || 0, reason: String(reason || ""), at: Date.now() };
+  setVoice({ heard: item.text, heardHit: item.hit, heardConf: item.conf, heardAt: item.at, log: [item, ...voice.log].slice(0, 6) });
+  if (!hit || voice.test) return; // při zkoušce se nic nespouští
   const norm = (s) => String(s || "").toLowerCase().replace(/[^\p{L}\p{N}\s]/gu, " ").replace(/\s+/g, " ").trim();
   const c = config.get().commands.find((x) => norm(x.phrase) === text);
   if (c) void runAction(c.action, c.param).then((r) => (!win || !win.isVisible()) && r.ok && r.message && actions.notify("Tejbot Assistent", r.message));
@@ -342,6 +369,16 @@ fromVoice("voiceHeard", ({ text, hit, conf }) => {
 const handle = (name, fn) => ipcMain.handle(`tb:${name}`, (_e, ...args) => fn(...args));
 
 handle("state", () => fullState());
+handle("voiceTest", (on) => {
+  setVoice({ test: !!on, log: [] });
+  return fullState();
+});
+handle("voiceCalibrate", () => {
+  if (!voiceWin || voiceWin.isDestroyed() || voice.status !== "listening") return fullState();
+  voiceWin.webContents.send("tb:calibrate");
+  setVoice({ calib: "run" });
+  return fullState();
+});
 handle("pair", async (code) => {
   try {
     const r = await api.pair(String(code || ""));
@@ -403,6 +440,9 @@ handle("saveSettings", (patch) => {
     if (typeof v.enabled === "boolean") cfg.voice.enabled = v.enabled;
     if (typeof v.lang === "string") cfg.voice.lang = v.lang.slice(0, 2);
     if (typeof v.deviceId === "string") cfg.voice.deviceId = v.deviceId.slice(0, 200);
+    if (typeof v.wake === "boolean") cfg.voice.wake = v.wake;
+    if (typeof v.wakeWord === "string") cfg.voice.wakeWord = v.wakeWord.toLowerCase().replace(/[^\p{L}\s]/gu, " ").trim().split(/\s+/).slice(0, 2).join(" ").slice(0, 30);
+    if ([60, 75, 90].includes(v.strict)) cfg.voice.strict = v.strict;
     config.save();
     restartVoice();
   }
@@ -424,7 +464,7 @@ handle("saveCommands", (list) => {
   config.get().commands = (Array.isArray(list) ? list : [])
     .slice(0, 40)
     .filter((c) => c && known.has(c.action))
-    .map((c) => ({ id: s(c.id, 40) || randomUUID(), name: s(c.name, 60), phrase: s(c.phrase, 80).toLowerCase(), hotkey: s(c.hotkey, 40), action: c.action, param: s(c.param, 120) }));
+    .map((c) => ({ id: s(c.id, 40) || randomUUID(), name: s(c.name, 60), phrase: s(c.phrase, 80).toLowerCase().trim().split(/\s+/).filter(Boolean).slice(0, 3).join(" "), hotkey: s(c.hotkey, 40), action: c.action, param: s(c.param, 120) }));
   config.save();
   registerHotkeys();
   restartVoice();
