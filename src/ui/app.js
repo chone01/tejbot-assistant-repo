@@ -89,6 +89,7 @@ const TABS = () => [
   ["home", "🏠", t("Přehled", "Overview")],
   ["cmds", "⌨️", t("Příkazy", "Commands")],
   ["obs", "🎥", "OBS"],
+  ["mic", "🎚️", t("Mikrofon", "Microphone")],
   ["voice", "🎙️", t("Hlas", "Voice")],
   ["music", "🎧", t("Hudba", "Music")],
   ["settings", "⚙️", t("Nastavení", "Settings")],
@@ -330,6 +331,60 @@ function tabVoice() {
   </div>`;
 }
 
+// ---------------------------------------------------------------- mikrofon (presety jako filtry v OBS)
+let M = null; // stav z OBS
+let mv = null; // právě nastavené hodnoty na posuvnících
+let mpreset = "";
+let micTimer = null;
+async function loadMic() {
+  M = await tb.call("micStatus");
+  if (!mv) {
+    mv = { ...M.values };
+    mpreset = M.preset;
+  }
+  if (tab === "mic") render();
+}
+function tabMic() {
+  const head = `<div class="head"><h1>${t("Mikrofon", "Microphone")}</h1><p class="muted">${t("Presety zvuku mikrofonu. Aplikace je nastaví jako filtry přímo v OBS, takže platí pro stream a nahrávky. Fungují i s vypnutou aplikací.", "Microphone sound presets. The app sets them as filters right in OBS, so they apply to your stream and recordings. They keep working with the app closed.")}</p></div>`;
+  if (!M) return `${head}<div class="card"><p class="muted">${t("Načítám…", "Loading…")}</p></div>`;
+  if (!M.ready) return `${head}<div class="card"><p class="error">${esc(M.error)}</p><p class="muted small" style="margin-top:6px">${t("Mikrofon vybereš v záložce OBS.", "Pick your microphone in the OBS tab.")}</p><div style="margin-top:10px"><button class="btn sm" data-tab="obs">${t("Otevřít záložku OBS", "Open the OBS tab")}</button> <button class="btn sm" id="micreload">${t("Zkusit znovu", "Try again")}</button></div></div>`;
+  const state = M.applied ? (M.bypass ? ["warn", t("Preset je v OBS, ale teď je vypnutý (porovnání)", "The preset is in OBS but currently off (comparison)")] : ["ok", t("Preset je v OBS zapnutý", "The preset is on in OBS")]) : ["", t("V OBS zatím žádný preset není", "No preset in OBS yet")];
+  const slider = (f) =>
+    f.type === "bool"
+      ? `<label class="check" style="grid-column:1/-1"><input type="checkbox" data-mic="${f.key}" ${mv[f.key] ? "checked" : ""} /><span><b>${esc(t(f.cs, f.en))}</b></span></label>`
+      : `<div><label class="f">${esc(t(f.cs, f.en))} <b data-micval="${f.key}" style="float:right">${mv[f.key]} ${f.unit}</b></label><input type="range" data-mic="${f.key}" min="${f.min}" max="${f.max}" step="${f.step}" value="${mv[f.key]}" style="width:100%" />${f.hintCs ? `<p class="muted small">${esc(t(f.hintCs, f.hintEn))}</p>` : ""}</div>`;
+  return `${head}
+  <div class="card">
+    <div class="row sp"><h2 style="margin:0"><span class="dot ${state[0]}" style="display:inline-block;margin-right:8px"></span>${state[1]}</h2><button class="btn sm" id="micreload">${t("Obnovit", "Refresh")}</button></div>
+    <h2 style="margin-top:16px">${t("1. Vyber preset", "1. Pick a preset")}</h2>
+    <div class="two">${M.presets
+      .map((p) => `<button class="btn" data-micpreset="${p.key}" style="justify-content:flex-start;text-align:left;${p.key === mpreset ? "border-color:var(--brand)" : ""}"><span><b>${esc(t(p.cs, p.en))}</b><br /><span class="muted small">${esc(t(p.descCs, p.descEn))}</span></span></button>`)
+      .join("")}</div>
+    <h2 style="margin-top:18px">${t("2. Dolaď si ho", "2. Fine-tune it")}</h2>
+    <div class="two">${M.fields.map(slider).join("")}</div>
+    <label class="check" style="margin-top:14px"><input type="checkbox" id="micothers" ${M.disableOthers ? "checked" : ""} /><span><b>${t("Vypnout moje ostatní filtry na mikrofonu", "Turn off my other microphone filters")}</b><br /><span class="muted small">${t(`Nesmažou se, jen se vypnou, ať se úpravy nesčítají. Teď jich tam máš: ${M.others}.`, `They aren't deleted, just turned off so effects don't stack. You have ${M.others} there now.`)}</span></span></label>
+    <h2 style="margin-top:18px">${t("3. Použij a poslechni si", "3. Apply and listen")}</h2>
+    <div class="row" style="gap:8px;flex-wrap:wrap">
+      <button class="btn primary" id="micapply">${M.applied ? t("Uložit změny do OBS", "Save changes to OBS") : t("Použít v OBS", "Apply in OBS")}</button>
+      <button class="btn ${M.monitoring ? "gold" : ""}" id="micmon">${M.monitoring ? t("Vypnout poslech", "Stop listening") : t("Poslech ve sluchátkách", "Listen in headphones")}</button>
+      <button class="btn" id="micab" ${M.applied ? "" : "disabled"}>${M.bypass ? t("Zapnout preset", "Turn preset on") : t("Porovnat: bez presetu", "Compare: without preset")}</button>
+      <button class="btn danger" id="micrevert" ${M.applied ? "" : "disabled"}>${t("Vrátit zpět", "Revert")}</button>
+    </div>
+    <p class="muted small" style="margin-top:8px">${M.applied ? t("Posuvníky teď mění zvuk v OBS hned, jak s nimi pohneš.", "The sliders now change the sound in OBS as you move them.") : t("Dokud nedáš „Použít v OBS“, v OBS se nic nemění.", "Nothing changes in OBS until you click “Apply in OBS”.")}</p>
+  </div>
+  <div class="card">
+    <h2>${t("Jak si to vyzkoušet", "How to try it")}</h2>
+    <ol class="steps">
+      <li>${t("Nasaď si sluchátka a klikni „Poslech ve sluchátkách“. Uslyšíš svůj mikrofon přes OBS.", "Put on headphones and click “Listen in headphones”. You'll hear your microphone through OBS.")}</li>
+      <li>${t("Klikni „Použít v OBS“ a mluv. Posuvníky mění zvuk hned.", "Click “Apply in OBS” and talk. The sliders change the sound right away.")}</li>
+      <li>${t("Tlačítkem „Porovnat“ přepínáš mezi zvukem bez presetu a s ním.", "Use “Compare” to switch between the sound without and with the preset.")}</li>
+      <li>${t("Nelíbí se? „Vrátit zpět“ smaže jen filtry od TejBota a zapne ty tvoje. Mikrofon bude jako předtím.", "Don't like it? “Revert” removes only TejBot's filters and turns yours back on. The microphone is as before.")}</li>
+    </ol>
+    <p class="muted small">${t("Pozor při živém vysílání: změny jdou rovnou do streamu. Zkoušej raději mimo stream, nebo si pusť nahrávání a poslechni si záznam. Když poslech neslyšíš, nastav v OBS Nastavení → Zvuk → Zařízení pro odposlech.", "Careful when live: changes go straight to the stream. Rather try it off stream, or record and listen back. If you can't hear the monitoring, set OBS Settings → Audio → Monitoring Device.")}</p>
+    <p class="muted small" style="margin-top:6px">${t("Filtry najdeš v OBS: pravým tlačítkem na mikrofon → Filtry. Začínají slovem TejBot. Presety jsou výchozí bod, konečný zvuk záleží na místnosti, vzdálenosti od mikrofonu a zisku na zvukovce.", "Find the filters in OBS: right-click the microphone → Filters. They start with TejBot. Presets are a starting point; the final sound depends on your room, mic distance and interface gain.")}</p>
+  </div>`;
+}
+
 function tabMusic() {
   const m = S.config.music;
   const src = [
@@ -402,7 +457,7 @@ function render() {
   if (S.web === "nopremium") return ($app.innerHTML = screenNoPremium()), bind();
   if (S.web === "offline" || S.web === "unknown") return ($app.innerHTML = screenOffline()), bind();
   if (!S.config.setupDone) return ($app.innerHTML = screenSetup()), bind();
-  const body = { home: tabHome, cmds: tabCmds, obs: tabObs, voice: tabVoice, music: tabMusic, settings: tabSettings }[tab]();
+  const body = { home: tabHome, cmds: tabCmds, obs: tabObs, mic: tabMic, voice: tabVoice, music: tabMusic, settings: tabSettings }[tab]();
   const ch = S.config.channel;
   $app.innerHTML = `<aside class="side">
     <div class="logo"><img src="icon.png" alt="" /> Tejbot Assistent</div>
@@ -426,6 +481,7 @@ async function openTab(k) {
   tab = k;
   if (k === "cmds") cmds = S.config.commands.map((c) => ({ ...c }));
   if (k === "cmds" || k === "obs") lists = await tb.call("obsLists");
+  if (k === "mic") void loadMic();
   render();
 }
 
@@ -538,6 +594,37 @@ function bind() {
   on("#voicestrict", "change", async (el) => apply(await tb.call("saveSettings", { voice: { strict: Number(el.value) } })));
   on("#voicecalib", "click", async () => apply(await tb.call("voiceCalibrate")));
   on("#voicetest", "click", async () => apply(await tb.call("voiceTest", !S.voice.test)));
+  // mikrofon
+  const micDo = async (name, ...args) => {
+    toast(await tb.call(name, ...args));
+    await loadMic();
+  };
+  const micLive = () => {
+    if (!M || !M.applied) return;
+    clearTimeout(micTimer);
+    micTimer = setTimeout(() => void tb.call("micApply", mpreset, mv, false), 200);
+  };
+  on("#micreload", "click", () => void loadMic());
+  on("[data-micpreset]", "click", (el) => {
+    const p = M.presets.find((x) => x.key === el.dataset.micpreset);
+    if (!p) return;
+    mpreset = p.key;
+    mv = { ...p.v };
+    render();
+    micLive();
+  });
+  on("[data-mic]", "input", (el) => {
+    const f = M.fields.find((x) => x.key === el.dataset.mic);
+    mv[f.key] = f.type === "bool" ? el.checked : Number(el.value);
+    mpreset = mpreset || "custom";
+    const out = document.querySelector(`[data-micval="${f.key}"]`);
+    if (out) out.textContent = `${mv[f.key]} ${f.unit}`;
+    micLive();
+  });
+  on("#micapply", "click", () => micDo("micApply", mpreset, mv, document.querySelector("#micothers").checked));
+  on("#micmon", "click", () => micDo("micMonitor", !M.monitoring));
+  on("#micab", "click", () => micDo("micBypass", !M.bypass));
+  on("#micrevert", "click", () => micDo("micRevert"));
   on("#voicelang", "change", async (el) => apply(await tb.call("saveSettings", { voice: { lang: el.value } })));
 
   // hudba

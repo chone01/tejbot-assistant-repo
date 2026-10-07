@@ -9,6 +9,7 @@ const { randomUUID } = require("crypto");
 const config = require("./config");
 const api = require("./api");
 const obs = require("./obs");
+const mic = require("./mic");
 const media = require("./media");
 const actions = require("./actions");
 
@@ -479,6 +480,12 @@ handle("obsLists", async () => {
   }
 });
 handle("obsReconnect", () => obs.reconnect());
+// presety mikrofonu (filtry v OBS)
+handle("micStatus", () => mic.status());
+handle("micApply", (preset, values, disableOthers) => mic.apply(preset, values, disableOthers));
+handle("micBypass", (on) => mic.bypass(!!on));
+handle("micMonitor", (on) => mic.monitor(!!on));
+handle("micRevert", () => mic.revert());
 handle("openSite", (p) => shell.openExternal(`${api.SITE}${typeof p === "string" && p.startsWith("/") ? p : "/"}`));
 // klipy: jen soubory ze složky s klipy (podle názvu), ať okno nemůže sáhnout jinam
 const clipPath = (name) => path.join(config.get().clipsDir, path.basename(String(name)));
