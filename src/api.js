@@ -33,4 +33,6 @@ module.exports = {
   unpair: () => call("DELETE", "/api/assistant/me"),
   nowPlaying: (track, changed) => call("POST", "/api/assistant/now-playing", { ...(track || { title: "" }), changed }),
   clip: (file, note) => call("POST", "/api/assistant/clip", { file, note }),
+  // akce na webu (alerty, TTS, písničky, video, odpočet)
+  action: (action) => call("POST", "/api/assistant/action", { action }),
 };

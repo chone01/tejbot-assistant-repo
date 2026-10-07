@@ -15,6 +15,21 @@ const ACTIONS = [
   { key: "record_toggle", cs: "Nahrávání: spustit / zastavit", en: "Recording: start / stop" },
   { key: "replay_toggle", cs: "Záznam do paměti: zapnout / vypnout", en: "Replay Buffer: on / off" },
   { key: "open_clips", cs: "Otevřít složku s klipy", en: "Open the clips folder" },
+  // akce na webu TejBota (nepotřebují OBS připojené k aplikaci, jen přihlášenou aplikaci)
+  { key: "web:alert_skip", cs: "Alerty: přeskočit právě běžící", en: "Alerts: skip the current one" },
+  { key: "web:alert_pause", cs: "Alerty: pozastavit", en: "Alerts: pause" },
+  { key: "web:alert_resume", cs: "Alerty: pokračovat", en: "Alerts: resume" },
+  { key: "web:alert_clear", cs: "Alerty: vyprázdnit frontu", en: "Alerts: clear the queue" },
+  { key: "web:alert_replay", cs: "Alerty: přehrát poslední znovu", en: "Alerts: replay the last one" },
+  { key: "web:tts_skip", cs: "TTS: přeskočit čtení", en: "TTS: skip reading" },
+  { key: "web:song_skip", cs: "Písničky: další", en: "Songs: next" },
+  { key: "web:song_pause", cs: "Písničky: pozastavit", en: "Songs: pause" },
+  { key: "web:song_play", cs: "Písničky: pokračovat", en: "Songs: resume" },
+  { key: "web:media_skip", cs: "Media share: přeskočit video", en: "Media share: skip the video" },
+  { key: "web:countdown_start", cs: "Odpočet: spustit", en: "Countdown: start" },
+  { key: "web:countdown_stop", cs: "Odpočet: zrušit", en: "Countdown: cancel" },
+  { key: "web:countdown_plus", cs: "Odpočet: přidat minutu", en: "Countdown: add a minute" },
+  { key: "web:countdown_minus", cs: "Odpočet: ubrat minutu", en: "Countdown: remove a minute" },
 ];
 
 const L = (cs, en) => (config.get().lang === "en" ? en : cs);
@@ -86,6 +101,14 @@ async function clip() {
 async function run(action, param) {
   try {
     let message = "";
+    if (String(action).startsWith("web:")) {
+      const r = await api.action(String(action).slice(4));
+      if (r.status === 402) throw new Error(L("Tohle je součást Premium.", "This is part of Premium."));
+      if (r.status === 429) throw new Error(L("Moc povelů za sebou, chvilku počkej.", "Too many commands in a row, wait a moment."));
+      if (!r.ok || !r.data) throw new Error(L("Web TejBota neodpověděl. Zkontroluj připojení.", "The TejBot site didn't respond. Check your connection."));
+      if (r.data.ok === false) throw new Error(L(r.data.cs, r.data.en));
+      return { ok: true, message: L(r.data.cs, r.data.en) };
+    }
     switch (action) {
       case "clip":
         message = await clip();
