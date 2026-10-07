@@ -20,7 +20,7 @@ const DEFAULTS = () => ({
   commands: [
     { id: randomUUID(), name: "Udělej klip", phrase: "udělej klip", hotkey: "", action: "clip", param: "" },
     { id: randomUUID(), name: "Vypni mikrofon", phrase: "vypni mikrofon", hotkey: "", action: "mic_mute", param: "" },
-    { id: randomUUID(), name: "Zapni mikrofon", phrase: "zapni mikrofon", hotkey: "", action: "mic_unmute", param: "" },
+    { id: randomUUID(), name: "Zapni mikrofon", phrase: "mikrofon nahlas", hotkey: "", action: "mic_unmute", param: "" },
   ],
 });
 

@@ -249,6 +249,19 @@ function heardRow(h) {
   const said = `${h.wake ? `${wakeName()} ` : ""}${esc(h.text)}`.trim();
   return `<li><span><b>${said ? `„${said}“` : "…"}</b></span><span class="tag ${why[1]}">${why[0]}</span></li>`;
 }
+// dva povely, které znějí skoro stejně (liší se nejvýš dvěma písmeny), si model plete
+function lev(a, b) {
+  const d = Array.from({ length: a.length + 1 }, (_, i) => [i, ...Array(b.length).fill(0)]);
+  for (let j = 1; j <= b.length; j++) d[0][j] = j;
+  for (let i = 1; i <= a.length; i++) for (let j = 1; j <= b.length; j++) d[i][j] = Math.min(d[i - 1][j] + 1, d[i][j - 1] + 1, d[i - 1][j - 1] + (a[i - 1] === b[j - 1] ? 0 : 1));
+  return d[a.length][b.length];
+}
+function similarPhrases() {
+  const p = [...new Set(S.config.commands.map((x) => x.phrase).filter(Boolean))];
+  const out = [];
+  for (let i = 0; i < p.length; i++) for (let j = i + 1; j < p.length; j++) if (lev(p[i], p[j]) <= 2) out.push([p[i], p[j]]);
+  return out;
+}
 function tabVoice() {
   const v = S.voice;
   const c = S.config.voice;
@@ -302,6 +315,7 @@ function tabVoice() {
         ? `<ul class="clips">${withPhrase.map((x) => `<li><span><b>„${S.config.voice.wake === false ? "" : `${wakeName()} `}${esc(x.phrase)}“</b></span><span class="muted small">${esc(t((S.actions.find((a) => a.key === x.action) || {}).cs || "", (S.actions.find((a) => a.key === x.action) || {}).en || ""))}${x.param ? `: ${esc(x.param)}` : ""}</span></li>`).join("")}</ul>`
         : `<p class="muted">${t("Žádná. V záložce Příkazy doplň u příkazu „Větu pro hlas“.", "None. Add a “Voice phrase” to a command in the Commands tab.")}</p>`
     }
+    ${similarPhrases().map(([a, b]) => `<p class="error">⚠ ${t(`Povely „${esc(a)}“ a „${esc(b)}“ znějí skoro stejně a budou se plést. Jeden z nich přepiš jinými slovy.`, `The commands “${esc(a)}” and “${esc(b)}” sound almost the same and will get mixed up. Reword one of them.`)}</p>`).join("")}
     ${v.unknown.length ? `<p class="error">⚠ ${t("Tahle slova hlasový model nezná, věta s nimi nebude fungovat. Zkus jiné slovo:", "The voice model doesn't know these words, so phrases with them won't work. Try another word:")} <b>${v.unknown.map(esc).join(", ")}</b></p>` : ""}
   </div>
   <div class="card">
