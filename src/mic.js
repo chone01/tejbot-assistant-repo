@@ -28,7 +28,7 @@ const PRESETS = [
   { key: "broadcast", cs: "Vysílací hlas", en: "Broadcast voice", descCs: "Plný, vyrovnaný hlas jako z rádia", descEn: "A full, even radio-style voice", v: { denoise: true, gate: -32, low: 2, mid: -1.5, high: 3, comp: -20, ratio: 4, gain: 4, limit: -3 } },
   { key: "natural", cs: "Přirozený", en: "Natural", descCs: "Jen lehké vyčištění, hlas zůstane tvůj", descEn: "A light clean-up, your voice stays yours", v: { denoise: true, gate: -40, low: 0, mid: 0, high: 1.5, comp: -18, ratio: 2.5, gain: 2, limit: -2 } },
   { key: "noisy", cs: "Hlučná místnost", en: "Noisy room", descCs: "Silnější brána proti větráku a klávesnici", descEn: "A stronger gate against fans and keyboards", v: { denoise: true, gate: -26, low: -2, mid: 0, high: 2, comp: -18, ratio: 4, gain: 3, limit: -3 } },
-  { key: "nt1a", cs: "Rode NT1-A", en: "Rode NT1-A", descCs: "Laděno podle ukázky: víc srozumitelnosti a hlasitosti (zisk na zvukovce nahoru)", descEn: "Tuned from a sample: more clarity and loudness (raise the interface gain)", v: { denoise: true, gate: -42, low: 0, mid: 3, high: 6, comp: -30, ratio: 4, gain: 15, limit: -2 } },
+  { key: "studio", cs: "Plný studiový hlas", en: "Full studio voice", descCs: "Plnost „Vysílacího hlasu“ + víc srozumitelnosti a hlasitosti. Pro tišší studiové mikrofony.", descEn: "The fullness of “Broadcast voice” plus more clarity and loudness. For quieter studio mics.", v: { denoise: true, gate: -40, low: 3, mid: 0.5, high: 5, comp: -28, ratio: 4, gain: 14, limit: -2 } },
 ];
 
 function clean(v) {
@@ -60,7 +60,7 @@ const ours = (f) => String(f.filterName || "").startsWith(TAG);
 /** Co je teď na mikrofonu v OBS (pro záložku Mikrofon) */
 async function status() {
   const m = config.get().mic;
-  const base = { fields: FIELDS, presets: PRESETS, preset: m.preset, values: clean(m.values), disableOthers: m.disableOthers !== false, applied: false, bypass: false, monitoring: false, others: 0, ready: false, error: "" };
+  const base = { fields: FIELDS, presets: PRESETS, preset: m.preset === "nt1a" ? "studio" : m.preset, values: clean(m.values), disableOthers: m.disableOthers !== false, applied: false, bypass: false, monitoring: false, others: 0, ready: false, error: "" };
   try {
     const source = micName();
     const filters = await listFilters(source);
@@ -103,7 +103,7 @@ async function apply(preset, values, disableOthers) {
       before.add(f.filterName);
     }
   }
-  cfg.mic = { ...cfg.mic, preset: String(preset || "custom").slice(0, 20), values: v, disableOthers: !!disableOthers, disabled: [...before].slice(0, 40), source };
+  cfg.mic = { ...cfg.mic, preset: String(preset || "custom").slice(0, 60), values: v, disableOthers: !!disableOthers, disabled: [...before].slice(0, 40), source };
   config.save();
   return { ok: true, message: skipped ? L(`Nastaveno. Filtr „${skipped}“ tvoje OBS nemá, zbytek funguje.`, `Applied. Your OBS doesn't have the “${skipped}” filter, the rest works.`) : L("Preset je v OBS nastavený.", "The preset is set in OBS.") };
 }
@@ -151,4 +151,4 @@ const safe = (fn) => async (...args) => {
   }
 };
 
-module.exports = { status, apply: safe(apply), bypass: safe(bypass), monitor: safe(monitor), revert: safe(revert), PRESETS, FIELDS };
+module.exports = { clean, status, apply: safe(apply), bypass: safe(bypass), monitor: safe(monitor), revert: safe(revert), PRESETS, FIELDS };

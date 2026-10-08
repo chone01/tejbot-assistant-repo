@@ -486,6 +486,38 @@ handle("micApply", (preset, values, disableOthers) => mic.apply(preset, values, 
 handle("micBypass", (on) => mic.bypass(!!on));
 handle("micMonitor", (on) => mic.monitor(!!on));
 handle("micRevert", () => mic.revert());
+// vlastní a veřejné presety (ukládají se na webu TejBota, max. 3 na kanál)
+const PRESET_ERR = {
+  limit: ["Máš už 3 vlastní presety. Některý smaž nebo přepiš.", "You already have 3 presets. Delete or overwrite one."],
+  name: ["Preset potřebuje název.", "The preset needs a name."],
+  values: ["Hodnoty presetu nejsou v pořádku.", "The preset values aren't valid."],
+  rate: ["Moc pokusů za chvíli. Zkus to za pár minut.", "Too many attempts. Try again in a few minutes."],
+  db: ["Web zatím presety neumí uložit (chybí aktualizace databáze 034).", "The website can't store presets yet (database update 034 is missing)."],
+  premium: ["Presety jsou součástí Premium.", "Presets are part of Premium."],
+};
+const presetCall = async (fn, okCs, okEn) => {
+  try {
+    const r = await fn();
+    if (r.ok) return { ok: true, message: L(okCs, okEn), data: r.data };
+    const e = PRESET_ERR[r.data && r.data.error];
+    return { ok: false, message: e ? L(e[0], e[1]) : L("Nepovedlo se, zkus to znovu.", "That didn't work, try again.") };
+  } catch {
+    return { ok: false, message: L("Nejde se připojit k TejBotu. Zkontroluj internet.", "Can't reach TejBot. Check your internet.") };
+  }
+};
+const presetBody = (p) => {
+  const o = p && typeof p === "object" ? p : {};
+  const out = {};
+  for (const k of ["name", "category", "microphone", "note"]) if (typeof o[k] === "string") out[k] = o[k].slice(0, 200);
+  if ("public" in o) out.is_public = o.public === true;
+  if (o.values) out.values = mic.clean(o.values);
+  return out;
+};
+handle("presetList", (q, cat) => presetCall(() => api.presets(String(q || "").slice(0, 60), String(cat || "")), "", ""));
+handle("presetCreate", (p) => presetCall(() => api.presetCreate(presetBody(p)), "Preset uložen.", "Preset saved."));
+handle("presetUpdate", (id, p) => presetCall(() => api.presetUpdate(String(id), presetBody(p)), "Preset uložen.", "Preset saved."));
+handle("presetDelete", (id) => presetCall(() => api.presetDelete(String(id)), "Preset smazán.", "Preset deleted."));
+handle("presetUsed", (id) => presetCall(() => api.presetUsed(String(id)), "", ""));
 handle("openSite", (p) => shell.openExternal(`${api.SITE}${typeof p === "string" && p.startsWith("/") ? p : "/"}`));
 // klipy: jen soubory ze složky s klipy (podle názvu), ať okno nemůže sáhnout jinam
 const clipPath = (name) => path.join(config.get().clipsDir, path.basename(String(name)));

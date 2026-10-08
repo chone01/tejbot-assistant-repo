@@ -12,12 +12,14 @@ let pairError = "";
 const t = (cs, en) => (S && S.config.lang === "en" ? en : cs);
 const esc = (v) => String(v ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c]);
 
+// hláška uprostřed okna na pár vteřin (stránka se kvůli ní nikam neposouvá)
 function toast(r) {
-  $toast.textContent = r.message;
+  if (!r || !r.message) return;
+  $toast.textContent = `${r.ok ? "✓ " : "⚠ "}${r.message}`;
   $toast.className = `toast ${r.ok ? "" : "bad"}`;
   $toast.hidden = false;
   clearTimeout(toast.t);
-  toast.t = setTimeout(() => ($toast.hidden = true), 4500);
+  toast.t = setTimeout(() => ($toast.hidden = true), r.ok ? 2800 : 5500);
 }
 
 // ---------------------------------------------------------------- obrazovky před spárováním
@@ -336,6 +338,31 @@ let M = null; // stav z OBS
 let mv = null; // právě nastavené hodnoty na posuvnících
 let mpreset = "";
 let micTimer = null;
+// vlastní a veřejné presety (z webu)
+let P = { loaded: false, loading: false, mine: [], list: [], max: 3, error: "" };
+let pq = "";
+let pcat = "";
+let pform = { name: "", category: "talk", microphone: "", public: false };
+const CATS = () => [
+  ["talk", t("Mluvení / Just chatting", "Talking / Just chatting")],
+  ["gaming", t("Hraní her", "Gaming")],
+  ["podcast", t("Podcast", "Podcast")],
+  ["singing", t("Zpěv", "Singing")],
+  ["noisy", t("Hlučná místnost", "Noisy room")],
+  ["asmr", t("Tichý hlas / ASMR", "Quiet voice / ASMR")],
+  ["other", t("Ostatní", "Other")],
+];
+const catName = (k) => (CATS().find((c) => c[0] === k) || [k, k])[1];
+async function loadPresets() {
+  P.loading = true;
+  const r = await tb.call("presetList", pq, pcat);
+  P.loading = false;
+  P.loaded = true;
+  if (r.ok) P = { ...P, mine: r.data.mine || [], list: r.data.list || [], max: r.data.max || 3, error: "" };
+  else P.error = r.message;
+  if (tab === "mic") render();
+}
+const ownPreset = () => (mpreset.startsWith("p:") ? P.mine.find((x) => `p:${x.id}` === mpreset) : null);
 async function loadMic() {
   M = await tb.call("micStatus");
   if (!mv) {
@@ -360,6 +387,7 @@ function tabMic() {
     <div class="two">${M.presets
       .map((p) => `<button class="btn" data-micpreset="${p.key}" style="justify-content:flex-start;text-align:left;${p.key === mpreset ? "border-color:var(--brand)" : ""}"><span><b>${esc(t(p.cs, p.en))}</b><br /><span class="muted small">${esc(t(p.descCs, p.descEn))}</span></span></button>`)
       .join("")}</div>
+    ${P.mine.length ? `<h2 style="margin-top:14px;font-size:14px">${t("Moje uložené", "My saved")}</h2><div class="two">${P.mine.map(presetBtn).join("")}</div>` : ""}
     <h2 style="margin-top:18px">${t("2. Dolaď si ho", "2. Fine-tune it")}</h2>
     <div class="two">${M.fields.map(slider).join("")}</div>
     <label class="check" style="margin-top:14px"><input type="checkbox" id="micothers" ${M.disableOthers ? "checked" : ""} /><span><b>${t("Vypnout moje ostatní filtry na mikrofonu", "Turn off my other microphone filters")}</b><br /><span class="muted small">${t(`Nesmažou se, jen se vypnou, ať se úpravy nesčítají. Teď jich tam máš: ${M.others}.`, `They aren't deleted, just turned off so effects don't stack. You have ${M.others} there now.`)}</span></span></label>
@@ -372,6 +400,7 @@ function tabMic() {
     </div>
     <p class="muted small" style="margin-top:8px">${M.applied ? t("Posuvníky teď mění zvuk v OBS hned, jak s nimi pohneš.", "The sliders now change the sound in OBS as you move them.") : t("Dokud nedáš „Použít v OBS“, v OBS se nic nemění.", "Nothing changes in OBS until you click “Apply in OBS”.")}</p>
   </div>
+  ${tabPresets()}
   <div class="card">
     <h2>${t("Jak si to vyzkoušet", "How to try it")}</h2>
     <ol class="steps">
@@ -382,6 +411,60 @@ function tabMic() {
     </ol>
     <p class="muted small">${t("Pozor při živém vysílání: změny jdou rovnou do streamu. Zkoušej raději mimo stream, nebo si pusť nahrávání a poslechni si záznam. Když poslech neslyšíš, nastav v OBS Nastavení → Zvuk → Zařízení pro odposlech.", "Careful when live: changes go straight to the stream. Rather try it off stream, or record and listen back. If you can't hear the monitoring, set OBS Settings → Audio → Monitoring Device.")}</p>
     <p class="muted small" style="margin-top:6px">${t("Filtry najdeš v OBS: pravým tlačítkem na mikrofon → Filtry. Začínají slovem TejBot. Presety jsou výchozí bod, konečný zvuk záleží na místnosti, vzdálenosti od mikrofonu a zisku na zvukovce.", "Find the filters in OBS: right-click the microphone → Filters. They start with TejBot. Presets are a starting point; the final sound depends on your room, mic distance and interface gain.")}</p>
+  </div>`;
+}
+
+function presetBtn(p) {
+  const meta = [p.mine ? (p.public ? t("veřejný", "public") : t("soukromý", "private")) : p.author, catName(p.category), p.microphone].filter(Boolean).map(esc).join(" · ");
+  return `<button class="btn" data-mypreset="${esc(p.id)}" style="justify-content:flex-start;text-align:left;${`p:${p.id}` === mpreset ? "border-color:var(--brand)" : ""}"><span><b>${p.mine ? "⭐ " : ""}${esc(p.name)}</b><br /><span class="muted small">${meta}</span></span></button>`;
+}
+function tabPresets() {
+  const own = ownPreset();
+  const full = P.mine.length >= P.max;
+  const catSel = (id, val, any) => `<select id="${id}">${any ? `<option value="">${t("Všechny kategorie", "All categories")}</option>` : ""}${CATS().map(([k, n]) => `<option value="${k}" ${k === val ? "selected" : ""}>${esc(n)}</option>`).join("")}</select>`;
+  return `<div class="card">
+    <div class="row sp"><h2 style="margin:0">${t("Moje presety", "My presets")} <span class="muted small">(${P.mine.length}/${P.max})</span></h2></div>
+    <p class="muted small" style="margin-top:4px">${t("Ulož si, co máš teď nastavené na posuvnících. Výchozí presety zůstanou, jak jsou. Presety se ukládají k tvému kanálu na webu, takže je máš i na jiném počítači.", "Save what you have on the sliders right now. The built-in presets stay as they are. Presets are stored with your channel on the website, so you have them on other computers too.")}</p>
+    ${P.error ? `<p class="error">${esc(P.error)}</p>` : ""}
+    ${
+      P.mine.length
+        ? `<ul class="clips" style="margin-top:10px">${P.mine
+            .map(
+              (p) => `<li><span><b>${esc(p.name)}</b> <span class="tag ${p.public ? "gold" : ""}">${p.public ? t("veřejný", "public") : t("soukromý", "private")}</span><br /><span class="muted small">${[catName(p.category), p.microphone].filter(Boolean).map(esc).join(" · ")}${p.public ? ` · ${t("použito", "used")} ${p.uses}×` : ""}</span></span>
+              <span class="row" style="gap:4px"><button class="btn sm" data-mypreset="${esc(p.id)}">${t("Načíst", "Load")}</button><button class="btn sm" data-pubtoggle="${esc(p.id)}">${p.public ? t("Skrýt", "Make private") : t("Zveřejnit", "Publish")}</button><button class="btn sm danger" data-pdel="${esc(p.id)}" title="${t("Smazat", "Delete")}">✕</button></span></li>`
+            )
+            .join("")}</ul>`
+        : P.loaded ? `<p class="muted" style="margin-top:8px">${t("Zatím žádný.", "None yet.")}</p>` : `<p class="muted" style="margin-top:8px">${t("Načítám…", "Loading…")}</p>`
+    }
+    <h2 style="margin-top:16px;font-size:14px">${own ? t(`Uložit nastavení (teď máš načtený „${esc(own.name)}“)`, `Save settings (you have “${esc(own.name)}” loaded)`) : t("Uložit současné nastavení jako preset", "Save the current settings as a preset")}</h2>
+    <div class="two">
+      <div><label class="f">${t("Název", "Name")}</label><input type="text" id="pname" maxlength="40" value="${esc(pform.name)}" placeholder="${t("např. Večerní stream", "e.g. Evening stream")}" /></div>
+      <div><label class="f">${t("Mikrofon (nepovinné)", "Microphone (optional)")}</label><input type="text" id="pmic" maxlength="60" value="${esc(pform.microphone)}" placeholder="${t("např. Rode NT1-A, Shure SM7B", "e.g. Rode NT1-A, Shure SM7B")}" /></div>
+      <div><label class="f">${t("Kategorie", "Category")}</label>${catSel("pcat", pform.category, false)}</div>
+      <div><label class="check" style="margin-top:22px"><input type="checkbox" id="ppublic" ${pform.public ? "checked" : ""} /><span><b>${t("Veřejný", "Public")}</b> <span class="muted small">${t("najdou ho i ostatní streameři", "other streamers can find it")}</span></span></label></div>
+    </div>
+    <div class="row" style="gap:8px;margin-top:12px;flex-wrap:wrap">
+      ${own ? `<button class="btn primary" id="poverwrite">${t(`Přepsat „${esc(own.name)}“`, `Overwrite “${esc(own.name)}”`)}</button>` : ""}
+      <button class="btn ${own ? "" : "primary"}" id="psave" ${full ? "disabled" : ""}>${t("Uložit jako nový", "Save as new")}</button>
+      ${full ? `<span class="muted small">${t("Máš plno (3/3). Některý smaž, nebo načti a přepiš.", "You're full (3/3). Delete one, or load and overwrite it.")}</span>` : ""}
+    </div>
+  </div>
+  <div class="card">
+    <h2>${t("Presety od ostatních", "Presets from others")}</h2>
+    <p class="muted small">${t("Veřejné presety ostatních streamerů. Hledej podle názvu nebo mikrofonu. Načtený preset si dolaď a ulož jako svůj.", "Public presets from other streamers. Search by name or microphone. Fine-tune a loaded preset and save it as yours.")}</p>
+    <div class="two" style="margin-top:10px">
+      <div><label class="f">${t("Hledat (název nebo mikrofon)", "Search (name or microphone)")}</label><input type="text" id="pq" maxlength="60" value="${esc(pq)}" placeholder="${t("např. SM7B", "e.g. SM7B")}" /></div>
+      <div><label class="f">${t("Kategorie", "Category")}</label>${catSel("pqcat", pcat, true)}</div>
+    </div>
+    <div style="margin-top:10px"><button class="btn" id="psearch" ${P.loading ? "disabled" : ""}>🔍 ${t("Hledat", "Search")}</button></div>
+    ${
+      P.list.filter((x) => !x.mine).length
+        ? `<div class="two" style="margin-top:12px">${P.list
+            .filter((x) => !x.mine)
+            .map((p) => presetBtn(p).replace("</span></span></button>", `${p.uses ? ` · ${t("použito", "used")} ${p.uses}×` : ""}</span></span></button>`))
+            .join("")}</div>`
+        : P.loaded ? `<p class="muted" style="margin-top:10px">${t("Nic nenalezeno. Buď první, kdo sem dá svůj preset.", "Nothing found. Be the first to share yours.")}</p>` : ""
+    }
   </div>`;
 }
 
@@ -459,6 +542,10 @@ function render() {
   if (!S.config.setupDone) return ($app.innerHTML = screenSetup()), bind();
   const body = { home: tabHome, cmds: tabCmds, obs: tabObs, mic: tabMic, voice: tabVoice, music: tabMusic, settings: tabSettings }[tab]();
   const ch = S.config.channel;
+  // překreslení nesmí okno posunout nahoru (třeba po uložení)
+  const prevMain = document.querySelector(".main");
+  const keep = prevMain && render.tab === tab ? prevMain.scrollTop : 0;
+  render.tab = tab;
   $app.innerHTML = `<aside class="side">
     <div class="logo"><img src="icon.png" alt="" /> Tejbot Assistent</div>
     <nav class="nav">${TABS()
@@ -466,6 +553,7 @@ function render() {
       .join("")}</nav>
     <div class="foot"><div class="chan">${ch.avatar ? `<img src="${esc(ch.avatar)}" alt="" />` : ""}<span>${esc(ch.name)}</span></div><p class="muted small" style="margin-top:4px">👑 Premium</p></div>
   </aside><main class="main">${body}</main>`;
+  if (keep) document.querySelector(".main").scrollTop = keep;
   bind();
 }
 
@@ -481,7 +569,10 @@ async function openTab(k) {
   tab = k;
   if (k === "cmds") cmds = S.config.commands.map((c) => ({ ...c }));
   if (k === "cmds" || k === "obs") lists = await tb.call("obsLists");
-  if (k === "mic") void loadMic();
+  if (k === "mic") {
+    void loadMic();
+    void loadPresets();
+  }
   render();
 }
 
@@ -620,6 +711,55 @@ function bind() {
     const out = document.querySelector(`[data-micval="${f.key}"]`);
     if (out) out.textContent = `${mv[f.key]} ${f.unit}`;
     micLive();
+  });
+  on("[data-mypreset]", "click", (el) => {
+    const p = [...P.mine, ...P.list].find((x) => x.id === el.dataset.mypreset);
+    if (!p) return;
+    mpreset = `p:${p.id}`;
+    mv = { ...mv, ...p.values };
+    if (p.mine) pform = { name: p.name, category: p.category, microphone: p.microphone, public: p.public };
+    else void tb.call("presetUsed", p.id);
+    render();
+    micLive();
+    toast({ ok: true, message: t(`Načteno: ${p.name}`, `Loaded: ${p.name}`) });
+  });
+  on("#pname", "input", (el) => (pform.name = el.value));
+  on("#pmic", "input", (el) => (pform.microphone = el.value));
+  on("#pcat", "change", (el) => (pform.category = el.value));
+  on("#ppublic", "change", (el) => (pform.public = el.checked));
+  on("#pq", "input", (el) => (pq = el.value));
+  on("#pq", "keydown", (_el, e) => e.key === "Enter" && void loadPresets());
+  on("#pqcat", "change", (el) => {
+    pcat = el.value;
+    void loadPresets();
+  });
+  on("#psearch", "click", () => void loadPresets());
+  const presetSave = async (id) => {
+    if (!pform.name.trim()) return toast({ ok: false, message: t("Napiš presetu název.", "Give the preset a name.") });
+    const body = { ...pform, values: mv };
+    const r = id ? await tb.call("presetUpdate", id, body) : await tb.call("presetCreate", body);
+    toast(r);
+    if (r.ok && !id && r.data && r.data.id) mpreset = `p:${r.data.id}`;
+    await loadPresets();
+  };
+  on("#psave", "click", () => presetSave(""));
+  on("#poverwrite", "click", () => {
+    const own = ownPreset();
+    if (own) void presetSave(own.id);
+  });
+  on("[data-pubtoggle]", "click", async (el) => {
+    const p = P.mine.find((x) => x.id === el.dataset.pubtoggle);
+    if (!p) return;
+    const r = await tb.call("presetUpdate", p.id, { public: !p.public });
+    toast(r.ok ? { ok: true, message: p.public ? t("Preset je teď soukromý.", "The preset is now private.") : t("Preset je teď veřejný.", "The preset is now public.") } : r);
+    await loadPresets();
+  });
+  on("[data-pdel]", "click", async (el) => {
+    const p = P.mine.find((x) => x.id === el.dataset.pdel);
+    if (!p || !confirm(t(`Smazat preset „${p.name}“?`, `Delete the preset “${p.name}”?`))) return;
+    toast(await tb.call("presetDelete", p.id));
+    if (mpreset === `p:${p.id}`) mpreset = "custom";
+    await loadPresets();
   });
   on("#micapply", "click", () => micDo("micApply", mpreset, mv, document.querySelector("#micothers").checked));
   on("#micmon", "click", () => micDo("micMonitor", !M.monitoring));

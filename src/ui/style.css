@@ -69,7 +69,8 @@ ul.clips li { display: flex; justify-content: space-between; gap: 10px; align-it
 ul.clips li:first-child { border-top: 0; }
 ol.steps { margin: 8px 0 0; padding-left: 20px; color: var(--soft); } ol.steps li { margin-bottom: 4px; }
 
-.toast { position: fixed; right: 20px; bottom: 20px; max-width: 420px; background: #1b1b23; border: 1px solid var(--brand); color: var(--ink); padding: 11px 16px; border-radius: 12px; box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5); }
+.toast { position: fixed; left: 50%; top: 50%; transform: translate(-50%, -50%); z-index: 60; max-width: min(460px, 86vw); background: rgba(22, 22, 30, 0.97); border: 1px solid var(--brand); color: var(--ink); padding: 16px 26px; border-radius: 14px; box-shadow: 0 18px 50px rgba(0, 0, 0, 0.6); font-size: 15px; font-weight: 600; text-align: center; pointer-events: none; animation: toastin 0.18s ease-out; }
+@keyframes toastin { from { opacity: 0; transform: translate(-50%, -46%) scale(0.97); } to { opacity: 1; transform: translate(-50%, -50%); } }
 .toast.bad { border-color: var(--red); }
 
 .clipgrid { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 12px; margin-top: 4px; }

@@ -35,4 +35,10 @@ module.exports = {
   clip: (file, note) => call("POST", "/api/assistant/clip", { file, note }),
   // akce na webu (alerty, TTS, písničky, video, odpočet)
   action: (action) => call("POST", "/api/assistant/action", { action }),
+  // presety mikrofonu: moje (max. 3) a veřejné od ostatních
+  presets: (q, cat) => call("GET", `/api/assistant/presets?q=${encodeURIComponent(q || "")}&cat=${encodeURIComponent(cat || "")}`),
+  presetCreate: (p) => call("POST", "/api/assistant/presets", p),
+  presetUpdate: (id, p) => call("PATCH", `/api/assistant/presets/${encodeURIComponent(id)}`, p),
+  presetDelete: (id) => call("DELETE", `/api/assistant/presets/${encodeURIComponent(id)}`),
+  presetUsed: (id) => call("POST", `/api/assistant/presets/${encodeURIComponent(id)}`),
 };
