@@ -415,7 +415,7 @@ function tabMic() {
 }
 
 function presetBtn(p) {
-  const meta = [p.mine ? (p.public ? t("veřejný", "public") : t("soukromý", "private")) : p.author, catName(p.category), p.microphone].filter(Boolean).map(esc).join(" · ");
+  const meta = [p.mine ? (p.public ? t("tvůj, veřejný", "yours, public") : t("tvůj, soukromý", "yours, private")) : p.author, catName(p.category), p.microphone].filter(Boolean).map(esc).join(" · ");
   return `<button class="btn" data-mypreset="${esc(p.id)}" style="justify-content:flex-start;text-align:left;${`p:${p.id}` === mpreset ? "border-color:var(--brand)" : ""}"><span><b>${p.mine ? "⭐ " : ""}${esc(p.name)}</b><br /><span class="muted small">${meta}</span></span></button>`;
 }
 function tabPresets() {
@@ -450,17 +450,16 @@ function tabPresets() {
     </div>
   </div>
   <div class="card">
-    <h2>${t("Presety od ostatních", "Presets from others")}</h2>
-    <p class="muted small">${t("Veřejné presety ostatních streamerů. Hledej podle názvu nebo mikrofonu. Načtený preset si dolaď a ulož jako svůj.", "Public presets from other streamers. Search by name or microphone. Fine-tune a loaded preset and save it as yours.")}</p>
+    <h2>${t("Komunitní presety", "Community presets")}</h2>
+    <p class="muted small">${t("Veřejné presety streamerů, i tvoje (⭐). Hledej podle názvu nebo mikrofonu. Načtený preset si dolaď a ulož jako svůj.", "Public presets from streamers, yours included (⭐). Search by name or microphone. Fine-tune a loaded preset and save it as yours.")}</p>
     <div class="two" style="margin-top:10px">
       <div><label class="f">${t("Hledat (název nebo mikrofon)", "Search (name or microphone)")}</label><input type="text" id="pq" maxlength="60" value="${esc(pq)}" placeholder="${t("např. SM7B", "e.g. SM7B")}" /></div>
       <div><label class="f">${t("Kategorie", "Category")}</label>${catSel("pqcat", pcat, true)}</div>
     </div>
     <div style="margin-top:10px"><button class="btn" id="psearch" ${P.loading ? "disabled" : ""}>🔍 ${t("Hledat", "Search")}</button></div>
     ${
-      P.list.filter((x) => !x.mine).length
+      P.list.length
         ? `<div class="two" style="margin-top:12px">${P.list
-            .filter((x) => !x.mine)
             .map((p) => presetBtn(p).replace("</span></span></button>", `${p.uses ? ` · ${t("použito", "used")} ${p.uses}×` : ""}</span></span></button>`))
             .join("")}</div>`
         : P.loaded ? `<p class="muted" style="margin-top:10px">${t("Nic nenalezeno. Buď první, kdo sem dá svůj preset.", "Nothing found. Be the first to share yours.")}</p>` : ""
