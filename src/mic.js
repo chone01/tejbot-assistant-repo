@@ -19,7 +19,7 @@ const FIELDS = [
   { key: "high", min: -12, max: 12, step: 0.5, unit: "dB", cs: "Výšky", en: "Treble" },
   { key: "comp", min: -40, max: 0, step: 1, unit: "dB", cs: "Kompresor: od jaké hlasitosti stlačuje", en: "Compressor: threshold", hintCs: "Níž = vyrovnanější a hutnější hlas", hintEn: "Lower = more even, denser voice" },
   { key: "ratio", min: 1, max: 10, step: 0.5, unit: ":1", cs: "Kompresor: síla", en: "Compressor: ratio" },
-  { key: "gain", min: -6, max: 18, step: 0.5, unit: "dB", cs: "Výsledná hlasitost", en: "Output volume" },
+  { key: "gain", min: -6, max: 24, step: 0.5, unit: "dB", cs: "Výsledná hlasitost", en: "Output volume" },
   { key: "limit", min: -12, max: 0, step: 0.5, unit: "dB", cs: "Limiter: strop hlasitosti", en: "Limiter: ceiling", hintCs: "Hlas nikdy nepřeleze tuhle hodnotu (nepřebuzuje)", hintEn: "Your voice never goes above this (no clipping)" },
 ];
 
@@ -28,7 +28,7 @@ const PRESETS = [
   { key: "broadcast", cs: "Vysílací hlas", en: "Broadcast voice", descCs: "Plný, vyrovnaný hlas jako z rádia", descEn: "A full, even radio-style voice", v: { denoise: true, gate: -32, low: 2, mid: -1.5, high: 3, comp: -20, ratio: 4, gain: 4, limit: -3 } },
   { key: "natural", cs: "Přirozený", en: "Natural", descCs: "Jen lehké vyčištění, hlas zůstane tvůj", descEn: "A light clean-up, your voice stays yours", v: { denoise: true, gate: -40, low: 0, mid: 0, high: 1.5, comp: -18, ratio: 2.5, gain: 2, limit: -2 } },
   { key: "noisy", cs: "Hlučná místnost", en: "Noisy room", descCs: "Silnější brána proti větráku a klávesnici", descEn: "A stronger gate against fans and keyboards", v: { denoise: true, gate: -26, low: -2, mid: 0, high: 2, comp: -18, ratio: 4, gain: 3, limit: -3 } },
-  { key: "nt1a", cs: "Rode NT1-A", en: "Rode NT1-A", descCs: "Pro citlivý kondenzátor s ostřejšími výškami", descEn: "For a sensitive condenser with brighter highs", v: { denoise: true, gate: -36, low: 1.5, mid: -2, high: 1, comp: -22, ratio: 3.5, gain: 5, limit: -3 } },
+  { key: "nt1a", cs: "Rode NT1-A", en: "Rode NT1-A", descCs: "Laděno podle ukázky: víc srozumitelnosti a hlasitosti (zisk na zvukovce nahoru)", descEn: "Tuned from a sample: more clarity and loudness (raise the interface gain)", v: { denoise: true, gate: -42, low: 0, mid: 3, high: 6, comp: -30, ratio: 4, gain: 15, limit: -2 } },
 ];
 
 function clean(v) {
