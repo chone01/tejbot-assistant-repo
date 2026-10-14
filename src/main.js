@@ -37,12 +37,15 @@ function showWindow() {
 
 function createWindow() {
   win = new BrowserWindow({
-    width: 980,
-    height: 700,
-    minWidth: 820,
+    width: 1120,
+    height: 760,
+    minWidth: 880,
     minHeight: 560,
-    backgroundColor: "#0a0a0f",
+    backgroundColor: "#07080c",
     title: "Tejbot Assistent",
+    // vlastní horní lišta (tmavá, splývá s aplikací); tlačítka minimalizovat/zavřít kreslí systém
+    titleBarStyle: "hidden",
+    titleBarOverlay: { color: "#00000000", symbolColor: "#c9cbd3", height: 50 },
     icon: path.join(__dirname, "..", "assets", "icon.png"),
     autoHideMenuBar: true,
     show: !process.argv.includes("--hidden"),
@@ -532,7 +535,6 @@ handle("trashClip", async (name) => {
   scanClips();
   return { ok: true };
 });
-handle("scanClips", () => scanClips());
 // Odinstalace: odpojí počítač na webu, zruší spouštění po startu, smaže nastavení a odstraní aplikaci.
 // Klipy (videa uživatele) se nemažou.
 handle("uninstall", async () => {

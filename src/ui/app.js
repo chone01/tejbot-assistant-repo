@@ -12,14 +12,78 @@ let pairError = "";
 const t = (cs, en) => (S && S.config.lang === "en" ? en : cs);
 const esc = (v) => String(v ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c]);
 
-// hláška uprostřed okna na pár vteřin (stránka se kvůli ní nikam neposouvá)
+// ikony (styl Lucide, kreslené čarou) – místo emoji, ať okno působí čistě a stejně na každém počítači
+const ICONS = {
+  home: '<rect x="3" y="3" width="7" height="9" rx="1.5"/><rect x="14" y="3" width="7" height="5" rx="1.5"/><rect x="14" y="12" width="7" height="9" rx="1.5"/><rect x="3" y="16" width="7" height="5" rx="1.5"/>',
+  keyboard: '<rect x="2" y="5" width="20" height="14" rx="2.5"/><path d="M6 9h.01M10 9h.01M14 9h.01M18 9h.01M6 13h.01M10 13h.01M14 13h.01M18 13h.01M8 17h8"/>',
+  obs: '<path d="m16 13 5.2 3.5a.5.5 0 0 0 .8-.4V7.9a.5.5 0 0 0-.8-.4L16 11"/><rect x="2" y="6" width="14" height="12" rx="2.5"/>',
+  sliders: '<path d="M4 21v-7M4 10V3M12 21v-9M12 8V3M20 21v-5M20 12V3M2 14h4M10 8h4M18 16h4"/>',
+  mic: '<path d="M12 2a3 3 0 0 0-3 3v7a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3Z"/><path d="M19 10v2a7 7 0 0 1-14 0v-2M12 19v3"/>',
+  micoff: '<path d="m2 2 20 20M18.9 13.2A7 7 0 0 0 19 12v-2M5 10v2a7 7 0 0 0 12 5M15 9.3V5a3 3 0 0 0-5.7-1.3M9 9v3a3 3 0 0 0 5.1 2.1M12 19v3"/>',
+  wave: '<path d="M2 10v3M6 6v11M10 3v18M14 8v7M18 5v13M22 10v3"/>',
+  music: '<path d="M9 18V5l12-2v13"/><circle cx="6" cy="18" r="3"/><circle cx="18" cy="16" r="3"/>',
+  settings: '<path d="M12.2 2h-.4a2 2 0 0 0-2 2v.2a2 2 0 0 1-1 1.7l-.4.3a2 2 0 0 1-2 0l-.2-.1a2 2 0 0 0-2.7.7l-.2.4a2 2 0 0 0 .7 2.7l.2.1a2 2 0 0 1 1 1.7v.5a2 2 0 0 1-1 1.7l-.2.1a2 2 0 0 0-.7 2.7l.2.4a2 2 0 0 0 2.7.7l.2-.1a2 2 0 0 1 2 0l.4.3a2 2 0 0 1 1 1.7v.2a2 2 0 0 0 2 2h.4a2 2 0 0 0 2-2v-.2a2 2 0 0 1 1-1.7l.4-.3a2 2 0 0 1 2 0l.2.1a2 2 0 0 0 2.7-.7l.2-.4a2 2 0 0 0-.7-2.7l-.2-.1a2 2 0 0 1-1-1.7v-.5a2 2 0 0 1 1-1.7l.2-.1a2 2 0 0 0 .7-2.7l-.2-.4a2 2 0 0 0-2.7-.7l-.2.1a2 2 0 0 1-2 0l-.4-.3a2 2 0 0 1-1-1.7V4a2 2 0 0 0-2-2z"/><circle cx="12" cy="12" r="3"/>',
+  scissors: '<circle cx="6" cy="6" r="3"/><circle cx="6" cy="18" r="3"/><path d="M20 4 8.1 15.9M14.5 14.5 20 20M8.1 8.1 12 12"/>',
+  folder: '<path d="M20 20a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2h-7.9a2 2 0 0 1-1.7-.9l-.8-1.2A2 2 0 0 0 7.9 3H4a2 2 0 0 0-2 2v13a2 2 0 0 0 2 2Z"/>',
+  rec: '<circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="3.5" fill="currentColor"/>',
+  refresh: '<path d="M3 12a9 9 0 0 1 15-6.7L21 8M21 3v5h-5M21 12a9 9 0 0 1-15 6.7L3 16M8 16H3v5"/>',
+  play: '<path d="M7 4.5v15l12-7.5z" fill="currentColor" stroke="none"/>',
+  trash: '<path d="M3 6h18M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/>',
+  x: '<path d="M18 6 6 18M6 6l12 12"/>',
+  plus: '<path d="M12 5v14M5 12h14"/>',
+  check: '<path d="M20 6 9 17l-5-5"/>',
+  alert: '<path d="M12 9v4M12 17h.01"/><path d="M10.3 3.9 1.8 18a2 2 0 0 0 1.7 3h17a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0z"/>',
+  crown: '<path d="M2 20h20M3 7l4.5 4L12 4l4.5 7L21 7l-2 10H5z"/>',
+  search: '<circle cx="11" cy="11" r="7.5"/><path d="m21 21-4.3-4.3"/>',
+  external: '<path d="M15 3h6v6M10 14 21 3M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/>',
+  power: '<path d="M12 2v10M18.4 6.6a9 9 0 1 1-12.8 0"/>',
+  download: '<path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4M7 10l5 5 5-5M12 15V3"/>',
+  info: '<circle cx="12" cy="12" r="10"/><path d="M12 16v-4M12 8h.01"/>',
+  headphones: '<path d="M3 14h3a2 2 0 0 1 2 2v3a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-7a9 9 0 0 1 18 0v7a2 2 0 0 1-2 2h-1a2 2 0 0 1-2-2v-3a2 2 0 0 1 2-2h3"/>',
+  globe: '<circle cx="12" cy="12" r="10"/><path d="M2 12h20M12 2a15 15 0 0 1 0 20M12 2a15 15 0 0 0 0 20"/>',
+  star: '<path d="m12 2 3.1 6.3 6.9 1-5 4.9 1.2 6.8L12 17.8 5.8 21l1.2-6.8-5-4.9 6.9-1z"/>',
+  link: '<path d="M10 13a5 5 0 0 0 7.5.5l3-3a5 5 0 0 0-7-7l-1.8 1.7M14 11a5 5 0 0 0-7.5-.5l-3 3a5 5 0 0 0 7 7l1.7-1.7"/>',
+  zap: '<path d="M13 2 3 14h9l-1 8 10-12h-9z"/>',
+  bulb: '<path d="M9 18h6M10 22h4M12 2a7 7 0 0 0-4 12.7V17h8v-2.3A7 7 0 0 0 12 2z"/>',
+  film: '<rect x="3" y="3" width="18" height="18" rx="2.5"/><path d="M7 3v18M17 3v18M3 7.5h4M3 12h18M3 16.5h4M17 7.5h4M17 16.5h4"/>',
+};
+const ic = (n, cls = "") => `<svg class="i ${cls}" viewBox="0 0 24 24" aria-hidden="true">${ICONS[n] || ""}</svg>`;
+const chip = (n, tone = "") => `<span class="chip ${tone}">${ic(n)}</span>`;
+
+// hláška dole uprostřed na pár vteřin (stránka se kvůli ní nikam neposouvá)
 function toast(r) {
   if (!r || !r.message) return;
-  $toast.textContent = `${r.ok ? "✓ " : "⚠ "}${r.message}`;
+  $toast.innerHTML = `<span class="ti">${ic(r.ok ? "check" : "x")}</span><span>${esc(r.message)}</span>`;
   $toast.className = `toast ${r.ok ? "" : "bad"}`;
   $toast.hidden = false;
   clearTimeout(toast.t);
   toast.t = setTimeout(() => ($toast.hidden = true), r.ok ? 2800 : 5500);
+}
+
+// potvrzovací okno v aplikaci (místo šedého systémového okénka)
+function ask(title, text, okLabel, danger = false) {
+  return new Promise((resolve) => {
+    const m = document.createElement("div");
+    m.className = "modal";
+    m.innerHTML = `<div class="mbox" role="dialog" aria-modal="true"><h2>${chip(danger ? "alert" : "info", danger ? "red" : "")}${esc(title)}</h2><p>${esc(text)}</p><div class="row"><button class="btn ghost" data-a="0">${t("Zrušit", "Cancel")}</button><button class="btn ${danger ? "danger" : "primary"}" data-a="1">${esc(okLabel)}</button></div></div>`;
+    const done = (v) => {
+      m.remove();
+      document.removeEventListener("keydown", key);
+      resolve(v);
+    };
+    const key = (e) => {
+      if (e.key === "Escape") done(false);
+      if (e.key === "Enter") done(true);
+    };
+    m.addEventListener("click", (e) => {
+      if (e.target === m) return done(false);
+      const b = e.target.closest("[data-a]");
+      if (b) done(b.dataset.a === "1");
+    });
+    document.addEventListener("keydown", key);
+    document.body.appendChild(m);
+    m.querySelector('[data-a="1"]').focus();
+  });
 }
 
 // ---------------------------------------------------------------- obrazovky před spárováním
@@ -43,7 +107,7 @@ function screenPair() {
         <li>${t("Kód opiš sem.", "Type the code here.")}</li>
       </ol>
     </div>
-    <p class="muted small" style="margin-top:14px">${t("Aplikace nechce heslo ke Kicku. Premium se kupuje jen na webu.", "The app never asks for your Kick password. Premium is bought on the website only.")} · <a id="lang">${S.config.lang === "en" ? "Česky" : "English"}</a></p>
+    <p class="muted small" style="margin-top:14px">${t("Aplikace nikdy nechce heslo k tvému účtu. Premium se kupuje jen na webu.", "The app never asks for your account password. Premium is bought on the website only.")} · <a id="lang">${S.config.lang === "en" ? "Česky" : "English"}</a></p>
   </div></div>`;
 }
 
@@ -54,7 +118,7 @@ function screenNoPremium() {
     <h1>${t("Aplikace je součástí Premium", "The app is part of Premium")}</h1>
     <p class="soft">${t("Kanál", "Channel")} <b>${esc(S.config.channel ? S.config.channel.name : "")}</b> ${t("teď Premium nemá. Pořídit ho jde jen na webu TejBota, v aplikaci se nic neplatí.", "doesn't have Premium right now. You can only get it on the TejBot website; nothing is paid in the app.")}</p>
     <div class="row" style="justify-content:center;margin-top:18px">
-      <button class="btn gold" data-open="/dashboard/${esc(id)}/premium">👑 ${t("Otevřít Premium na webu", "Open Premium on the website")}</button>
+      <button class="btn gold" data-open="/dashboard/${esc(id)}/premium">${ic("crown")} ${t("Otevřít Premium na webu", "Open Premium on the website")}</button>
       <button class="btn" id="refresh">${t("Zkusit znovu", "Try again")}</button>
     </div>
     <p style="margin-top:16px"><a id="unpair" class="muted small">${t("Odpojit aplikaci od kanálu", "Disconnect the app from the channel")}</a></p>
@@ -78,7 +142,7 @@ function screenSetup() {
     <div class="card">
       <div class="path" id="dir">${esc(S.config.clipsDir)}</div>
       <div class="row sp" style="margin-top:14px">
-        <button class="btn" id="pickdir">📁 ${t("Vybrat jinou složku", "Pick another folder")}</button>
+        <button class="btn" id="pickdir">${ic("folder")} ${t("Vybrat jinou složku", "Pick another folder")}</button>
         <button class="btn primary" id="finish">${t("Hotovo", "Done")}</button>
       </div>
     </div>
@@ -87,15 +151,14 @@ function screenSetup() {
 
 // ---------------------------------------------------------------- hlavní okno
 
-const TABS = () => [
-  ["home", "🏠", t("Přehled", "Overview")],
-  ["cmds", "⌨️", t("Příkazy", "Commands")],
-  ["obs", "🎥", "OBS"],
-  ["mic", "🎚️", t("Mikrofon", "Microphone")],
-  ["voice", "🎙️", t("Hlas", "Voice")],
-  ["music", "🎧", t("Hudba", "Music")],
-  ["settings", "⚙️", t("Nastavení", "Settings")],
+// menu po skupinách: [klíč, ikona, název]
+const NAV = () => [
+  ["", [["home", "home", t("Přehled", "Overview")]]],
+  [t("Ovládání", "Control"), [["cmds", "keyboard", t("Příkazy a zkratky", "Commands & hotkeys")], ["voice", "wave", t("Hlasové povely", "Voice commands")]]],
+  [t("Stream", "Stream"), [["obs", "obs", t("OBS a klipy", "OBS & clips")], ["mic", "sliders", t("Zvuk mikrofonu", "Microphone sound")], ["music", "music", t("Hudba ve streamu", "Music on stream")]]],
+  [t("Aplikace", "App"), [["settings", "settings", t("Nastavení", "Settings")]]],
 ];
+const TABS = () => NAV().flatMap(([, items]) => items);
 
 function obsLabel() {
   if (S.obs.connected) return ["ok", t("Připojeno", "Connected")];
@@ -113,7 +176,7 @@ function closePlayer() {
   $player.innerHTML = "";
 }
 function openPlayer(name) {
-  $player.innerHTML = `<div class="pbox"><div class="row sp" style="margin-bottom:10px"><b>${esc(name)}</b><span class="row"><button class="btn sm" id="pext">${t("Otevřít v přehrávači", "Open in player")}</button><button class="btn sm" id="pclose">✕ ${t("Zavřít", "Close")}</button></span></div><video src="tbclip://clip/${encodeURIComponent(name)}" controls autoplay></video><p class="error" id="perr" hidden>${t("Tenhle formát aplikace neumí přehrát (třeba MKV). Otevři ho tlačítkem „Otevřít v přehrávači“.", "The app can't play this format (e.g. MKV). Use “Open in player”.")}</p></div>`;
+  $player.innerHTML = `<div class="pbox"><div class="row sp" style="margin-bottom:10px"><b>${esc(name)}</b><span class="row"><button class="btn sm" id="pext">${ic("external")} ${t("Otevřít v přehrávači", "Open in player")}</button><button class="btn sm ghost" id="pclose">${ic("x")} ${t("Zavřít", "Close")}</button></span></div><video src="tbclip://clip/${encodeURIComponent(name)}" controls autoplay></video><p class="error" id="perr" hidden>${t("Tenhle formát aplikace neumí přehrát (třeba MKV). Otevři ho tlačítkem „Otevřít v přehrávači“.", "The app can't play this format (e.g. MKV). Use “Open in player”.")}</p></div>`;
   $player.hidden = false;
   $player.querySelector("video").addEventListener("error", () => ($player.querySelector("#perr").hidden = false));
   $player.querySelector("#pclose").addEventListener("click", closePlayer);
@@ -122,41 +185,46 @@ function openPlayer(name) {
 $player.addEventListener("click", (e) => e.target === $player && closePlayer());
 document.addEventListener("keydown", (e) => e.key === "Escape" && !$player.hidden && closePlayer());
 
+function hotkeyOf(action) {
+  const c = S.config.commands.find((x) => x.action === action && x.hotkey);
+  return c ? `<span class="kbd">${c.hotkey.split("+").map((k) => `<span>${esc(k)}</span>`).join("+")}</span>` : "";
+}
 function tabHome() {
   const [oc, ol] = obsLabel();
   const tr = S.track;
   const until = S.premium.lifetime ? t("napořád", "lifetime") : S.premium.until ? new Date(S.premium.until).toLocaleDateString(S.config.lang === "en" ? "en-GB" : "cs-CZ") : "";
-  return `<div class="head"><h1>${t("Přehled", "Overview")}</h1><p class="muted">${t("Aplikace běží u hodin i po zavření okna, aby fungovaly klávesové zkratky.", "The app keeps running in the tray after you close the window so your hotkeys work.")}</p></div>
+  const act = (run, icon, label, sub, main = false) => `<button class="act ${main ? "main" : ""}" data-run="${run}">${chip(icon, main ? "" : "cyan")}<span>${label}<br /><span class="muted">${sub}</span></span></button>`;
+  return `<div class="head"><h1>${t("Ahoj", "Hi")}, ${esc(S.config.channel.name)} 👋</h1><p class="muted">${t("Aplikace běží u hodin i po zavření okna, aby fungovaly klávesové zkratky a hlasové povely.", "The app keeps running in the tray after you close the window so hotkeys and voice commands work.")}</p></div>
   <div class="grid">
-    <div class="stat"><div class="k">TejBot</div><div class="v"><span class="dot ok"></span><span class="t">Premium ${until ? `· ${esc(until)}` : ""}</span></div></div>
-    <div class="stat"><div class="k">OBS</div><div class="v"><span class="dot ${oc}"></span><span class="t">${ol}</span></div></div>
-    <div class="stat"><div class="k">${t("Právě hraje", "Now playing")}</div><div class="v"><span class="dot ${tr ? "ok" : ""}"></span><span class="t">${tr ? esc(`${tr.artist ? `${tr.artist} – ` : ""}${tr.title}`) : S.config.music.enabled ? t("Nic", "Nothing") : t("Vypnuto", "Off")}</span></div></div>
+    <div class="stat premium"><div class="k">${ic("crown")} TejBot</div><div class="v"><span class="dot ok"></span><span class="t">Premium${until ? ` · ${esc(until)}` : ""}</span></div></div>
+    <div class="stat"><div class="k">${ic("obs")} OBS</div><div class="v"><span class="dot ${oc}"></span><span class="t">${ol}</span></div></div>
+    <div class="stat"><div class="k">${ic("music")} ${t("Právě hraje", "Now playing")}</div><div class="v"><span class="dot ${tr ? "ok" : ""}"></span><span class="t">${tr ? esc(`${tr.artist ? `${tr.artist} – ` : ""}${tr.title}`) : S.config.music.enabled ? t("Nic", "Nothing") : t("Vypnuto", "Off")}</span></div></div>
   </div>
-  ${!S.obs.connected ? `<div class="card"><h2>${t("OBS zatím není připojené", "OBS isn't connected yet")}</h2><p class="soft">${t("Spusť OBS a zapni v něm WebSocket server. Postup je v záložce OBS.", "Start OBS and enable its WebSocket server. See the OBS tab for the steps.")}</p><div style="margin-top:12px"><button class="btn" data-tab="obs">${t("Otevřít záložku OBS", "Open the OBS tab")}</button></div></div>` : ""}
+  ${!S.obs.connected ? `<div class="card warnc"><div class="row sp"><div><h2 style="margin-bottom:4px">${chip("alert", "gold")}${t("OBS zatím není připojené", "OBS isn't connected yet")}</h2><p class="soft">${t("Spusť OBS a zapni v něm WebSocket server. Bez něj nejdou klipy ani ovládání OBS.", "Start OBS and enable its WebSocket server. Clips and OBS control need it.")}</p></div><button class="btn" data-tab="obs">${t("Jak na to", "How to")} ›</button></div></div>` : ""}
   <div class="card">
-    <h2>${t("Rychlé akce", "Quick actions")}</h2>
-    <div class="row">
-      <button class="btn primary" data-run="clip">✂️ ${t("Uložit klip", "Save a clip")}</button>
-      <button class="btn" data-run="mic_toggle">🎙️ ${t("Mikrofon", "Microphone")}</button>
-      <button class="btn" data-run="record_toggle">⏺️ ${t("Nahrávání", "Recording")}</button>
-      <button class="btn" data-run="open_clips">📁 ${t("Složka s klipy", "Clips folder")}</button>
+    <h2>${chip("zap")}${t("Rychlé akce", "Quick actions")}</h2>
+    <div class="actions">
+      ${act("clip", "scissors", t("Uložit klip", "Save a clip"), hotkeyOf("clip") || t("posledních pár vteřin", "the last few seconds"), true)}
+      ${act("mic_toggle", "micoff", t("Ztlumit mikrofon", "Mute microphone"), hotkeyOf("mic_toggle") || t("zapnout / vypnout", "on / off"))}
+      ${act("record_toggle", "rec", t("Nahrávání", "Recording"), hotkeyOf("record_toggle") || t("spustit / zastavit", "start / stop"))}
+      ${act("open_clips", "folder", t("Složka s klipy", "Clips folder"), t("otevřít v počítači", "open on your computer"))}
     </div>
   </div>
   <div class="card">
-    <div class="row sp"><h2>${t("Moje klipy", "My clips")}</h2><button class="btn sm" data-run="open_clips">📁 ${t("Otevřít složku", "Open folder")}</button></div>
+    <div class="row sp" style="margin-bottom:12px"><h2 style="margin:0">${chip("film")}${t("Moje klipy", "My clips")} ${S.clips.length ? `<span class="tag">${S.clips.length}</span>` : ""}</h2><button class="btn sm" data-run="open_clips">${ic("folder")} ${t("Otevřít složku", "Open folder")}</button></div>
     ${
       S.clips.length
         ? `<div class="clipgrid">${S.clips
             .map(
               (c) => `<div class="clip">
-            <button class="thumb" data-play="${esc(c.name)}" title="${t("Přehrát", "Play")}"><video src="tbclip://clip/${encodeURIComponent(c.name)}#t=1" preload="metadata" muted tabindex="-1"></video><span class="play">▶</span></button>
+            <button class="thumb" data-play="${esc(c.name)}" title="${t("Přehrát", "Play")}"><video src="tbclip://clip/${encodeURIComponent(c.name)}#t=1" preload="metadata" muted tabindex="-1"></video><span class="play"><span>${ic("play")}</span></span></button>
             <div class="cname" title="${esc(c.name)}">${esc(c.name)}</div>
             <div class="row sp"><span class="muted small">${when(c.at)} · ${(c.size / 1048576).toFixed(1)} MB</span>
-            <span class="row" style="gap:4px"><button class="btn sm" data-show="${esc(c.name)}" title="${t("Ukázat ve složce", "Show in folder")}">📁</button><button class="btn sm danger" data-trash="${esc(c.name)}" title="${t("Smazat (do koše)", "Delete (to the bin)")}">🗑️</button></span></div>
+            <span class="row" style="gap:4px"><button class="btn sm icon ghost" data-show="${esc(c.name)}" title="${t("Ukázat ve složce", "Show in folder")}">${ic("folder")}</button><button class="btn sm icon danger" data-trash="${esc(c.name)}" title="${t("Smazat (do koše)", "Delete (to the bin)")}">${ic("trash")}</button></span></div>
           </div>`
             )
             .join("")}</div>`
-        : `<p class="muted">${t("Zatím žádný. Klipy se ukládají do:", "None yet. Clips are saved to:")}</p><div class="path" style="margin-top:8px">${esc(S.config.clipsDir)}</div>`
+        : `<div class="empty">${chip("film", "cyan")}<p>${t("Zatím žádný klip. Ulož první tlačítkem „Uložit klip“ nebo zkratkou.", "No clips yet. Save your first with “Save a clip” or a hotkey.")}</p><div class="path">${esc(S.config.clipsDir)}</div></div>`
     }
   </div>`;
 }
@@ -165,63 +233,60 @@ function actionSelect(c, i) {
   return `<select data-cmd="${i}" data-k="action">${S.actions.map((a) => `<option value="${a.key}" ${a.key === c.action ? "selected" : ""}>${esc(t(a.cs, a.en))}</option>`).join("")}</select>`;
 }
 function tabCmds() {
-  return `<div class="head"><h1>${t("Příkazy", "Commands")}</h1><p class="muted">${t("Každý příkaz má akci a způsob, jak ji spustit: klávesovou zkratku, která funguje i ve hře, a větu pro hlas.", "Each command has an action and a way to trigger it: a hotkey that works in-game too, and a phrase for voice.")}</p></div>
+  return `<div class="head"><h1>${t("Příkazy a zkratky", "Commands & hotkeys")}</h1><p class="muted">${t("Každý příkaz má akci a způsob, jak ji spustit: klávesovou zkratku, která funguje i ve hře, a větu pro hlas.", "Each command has an action and a way to trigger it: a hotkey that works in-game too, and a phrase for voice.")}</p></div>
   <div class="card">
+    <h2>${chip("keyboard")}${t("Tvoje příkazy", "Your commands")} <span class="tag">${cmds.length}</span></h2>
     ${cmds
       .map((c, i) => {
         const needsScene = c.action === "scene";
         return `<div class="cmd">
         <div><label class="f">${t("Název", "Name")}</label><input type="text" data-cmd="${i}" data-k="name" value="${esc(c.name)}" maxlength="60" /></div>
         <div><label class="f">${t("Akce", "Action")}</label>${actionSelect(c, i)}${needsScene ? `<select style="margin-top:6px" data-cmd="${i}" data-k="param"><option value="">${t("– vyber scénu –", "– pick a scene –")}</option>${[...new Set([...lists.scenes, c.param].filter(Boolean))].map((s) => `<option ${s === c.param ? "selected" : ""}>${esc(s)}</option>`).join("")}</select>` : ""}</div>
-        <div><label class="f">${t("Povel pro hlas (max. 3 slova)", "Voice command (max 3 words)")}</label><input type="text" data-cmd="${i}" data-k="phrase" value="${esc(c.phrase)}" maxlength="80" placeholder="${t("např. udělej klip", "e.g. make a clip")}" /></div>
+        <div><label class="f">${t("Věta pro hlas", "Voice phrase")}</label><input type="text" data-cmd="${i}" data-k="phrase" value="${esc(c.phrase)}" maxlength="80" placeholder="${t("např. udělej klip (max. 3 slova)", "e.g. make a clip (max 3 words)")}" /></div>
         <div><label class="f">${t("Klávesová zkratka", "Hotkey")}</label><input type="text" class="key" readonly data-key="${i}" value="${esc(c.hotkey)}" placeholder="${t("klikni a zmáčkni", "click and press")}" /></div>
-        <div class="row"><button class="btn sm" data-test="${i}" title="${t("Vyzkoušet", "Test")}">▶</button><button class="btn sm danger" data-del="${i}" title="${t("Smazat", "Delete")}">✕</button></div>
-        ${S.hotkeyErrors.includes(c.id) ? `<div class="err">⚠ ${t("Tuhle zkratku už používá jiný program, zvol jinou.", "Another program already uses this hotkey, pick a different one.")}</div>` : ""}
+        <div class="row" style="gap:6px"><button class="btn sm icon" data-test="${i}" title="${t("Vyzkoušet", "Test")}">${ic("play")}</button><button class="btn sm icon danger" data-del="${i}" title="${t("Smazat", "Delete")}">${ic("trash")}</button></div>
+        ${S.hotkeyErrors.includes(c.id) ? `<div class="err">${ic("alert")} ${t("Tuhle zkratku už používá jiný program, zvol jinou.", "Another program already uses this hotkey, pick a different one.")}</div>` : ""}
       </div>`;
       })
       .join("")}
-    ${cmds.length === 0 ? `<p class="muted">${t("Zatím žádný příkaz.", "No commands yet.")}</p>` : ""}
+    ${cmds.length === 0 ? `<div class="empty">${chip("keyboard", "cyan")}<p>${t("Zatím žádný příkaz.", "No commands yet.")}</p></div>` : ""}
     <div class="row sp" style="margin-top:14px">
-      <button class="btn" id="addcmd">+ ${t("Přidat příkaz", "Add a command")}</button>
-      <button class="btn primary" id="savecmds">${t("Uložit příkazy", "Save commands")}</button>
+      <button class="btn" id="addcmd">${ic("plus")} ${t("Přidat příkaz", "Add a command")}</button>
+      <button class="btn primary" id="savecmds">${ic("check")} ${t("Uložit příkazy", "Save commands")}</button>
     </div>
   </div>
-  <p class="muted small">${t("Zkratku smažeš klávesou Backspace. Hlasové povely zapneš v záložce Hlas.", "Clear a hotkey with Backspace. Turn voice commands on in the Voice tab.")}</p>`;
+  <p class="muted small">${t("Zkratku smažeš klávesou Backspace. Hlasové povely zapneš v části Hlasové povely.", "Clear a hotkey with Backspace. Turn voice commands on under Voice commands.")}</p>`;
 }
 
 function tabObs() {
   const [oc, ol] = obsLabel();
   const o = S.config.obs;
-  return `<div class="head"><h1>OBS</h1><p class="muted">${t("Aplikace ovládá tvoje OBS přes vestavěný WebSocket server (OBS 28 a novější).", "The app controls your OBS through its built-in WebSocket server (OBS 28 or newer).")}</p></div>
-  <div class="card">
-    <div class="row sp"><h2 style="margin:0"><span class="dot ${oc}" style="display:inline-block;margin-right:8px"></span>${ol}</h2><button class="btn sm" id="obsre">${t("Připojit znovu", "Reconnect")}</button></div>
-    ${!S.obs.connected && !S.obs.connecting && S.obs.error === "password" ? `<p class="error">${S.hasObsPassword ? t("OBS heslo odmítlo. Zkopíruj ho v OBS znovu (Zobrazit informace o připojení → Kopírovat) a vlož sem.", "OBS rejected the password. Copy it again in OBS (Show Connect Info → Copy) and paste it here.") : t("OBS chce heslo. Vlož ho níže.", "OBS wants a password. Paste it below.")}</p>` : ""}
-    ${!S.obs.connected && !S.obs.connecting && S.obs.error === "offline" ? `<p class="error">${t("K OBS se nejde připojit. Běží OBS a je v něm zapnutý WebSocket server?", "Can't connect to OBS. Is OBS running with the WebSocket server enabled?")}</p>` : ""}
-    ${!S.obs.connected && S.obs.detail ? `<p class="muted small" style="margin-top:4px">${t("Podrobnosti", "Details")}: ${esc(S.obs.detail)}</p>` : ""}
-    <ol class="steps">
-      <li>${t("V OBS nahoře klikni na Nástroje → Nastavení WebSocket serveru.", "In OBS click Tools → WebSocket Server Settings.")}</li>
-      <li>${t("Zaškrtni „Povolit WebSocket server“.", "Tick “Enable WebSocket server”.")}</li>
-      <li>${t("Klikni na „Zobrazit informace o připojení“, zkopíruj heslo a vlož ho sem.", "Click “Show Connect Info”, copy the password and paste it here.")}</li>
-    </ol>
-    <div class="two" style="margin-top:14px">
+  return `<div class="head"><h1>${t("OBS a klipy", "OBS & clips")}</h1><p class="muted">${t("Aplikace ovládá tvoje OBS přes vestavěný WebSocket server (OBS 28 a novější) a ukládá z něj klipy.", "The app controls your OBS through its built-in WebSocket server (OBS 28 or newer) and saves clips from it.")}</p></div>
+  <div class="card ${S.obs.connected ? "glow" : ""}">
+    <div class="row sp"><h2 style="margin:0">${chip("obs")}${t("Připojení k OBS", "OBS connection")}<span class="tag ${S.obs.connected ? "ok" : ""}"><span class="dot ${oc}"></span>${ol}</span></h2><button class="btn sm" id="obsre">${ic("refresh")} ${t("Připojit znovu", "Reconnect")}</button></div>
+    ${!S.obs.connected && !S.obs.connecting && S.obs.error === "password" ? `<div class="note">${ic("alert")}<span>${S.hasObsPassword ? t("OBS heslo odmítlo. Zkopíruj ho v OBS znovu (Zobrazit informace o připojení → Kopírovat) a vlož sem.", "OBS rejected the password. Copy it again in OBS (Show Connect Info → Copy) and paste it here.") : t("OBS chce heslo. Vlož ho níže.", "OBS wants a password. Paste it below.")}</span></div>` : ""}
+    ${!S.obs.connected && !S.obs.connecting && S.obs.error === "offline" ? `<div class="note">${ic("alert")}<span>${t("K OBS se nejde připojit. Běží OBS a je v něm zapnutý WebSocket server?", "Can't connect to OBS. Is OBS running with the WebSocket server enabled?")}</span></div>` : ""}
+    ${!S.obs.connected && S.obs.detail ? `<p class="muted small" style="margin-top:6px">${t("Podrobnosti", "Details")}: ${esc(S.obs.detail)}</p>` : ""}
+    <div class="two" style="margin-top:16px">
       <div><label class="f">${t("Adresa", "Address")}</label><input type="text" id="obsurl" value="${esc(o.url)}" /></div>
       <div><label class="f">${t("Heslo", "Password")}</label><input type="password" id="obspw" placeholder="${S.hasObsPassword ? t("uložené (napiš nové pro změnu)", "saved (type a new one to change)") : ""}" /></div>
     </div>
-    <div style="margin-top:12px"><button class="btn primary" id="saveobs">${t("Uložit a připojit", "Save and connect")}</button></div>
+    <div style="margin-top:14px"><button class="btn primary" id="saveobs">${ic("link")} ${t("Uložit a připojit", "Save and connect")}</button></div>
+    <details class="more" ${S.obs.connected ? "" : "open"}>
+      <summary>${ic("info")} ${t("Jak zapnout WebSocket server v OBS", "How to enable the WebSocket server in OBS")}</summary>
+      <ol class="steps">
+        <li>${t("V OBS nahoře klikni na Nástroje → Nastavení WebSocket serveru.", "In OBS click Tools → WebSocket Server Settings.")}</li>
+        <li>${t("Zaškrtni „Povolit WebSocket server“.", "Tick “Enable WebSocket server”.")}</li>
+        <li>${t("Klikni na „Zobrazit informace o připojení“, zkopíruj heslo a vlož ho sem.", "Click “Show Connect Info”, copy the password and paste it here.")}</li>
+      </ol>
+    </details>
   </div>
   <div class="card">
-    <h2>${t("Mikrofon", "Microphone")}</h2>
-    <div class="field"><label class="f">${t("Který vstup v OBS je tvůj mikrofon", "Which OBS input is your microphone")}</label>
-      <select id="mic"><option value="">${t("– vyber –", "– pick –")}</option>${[...new Set([...lists.inputs, o.mic].filter(Boolean))].map((n) => `<option ${n === o.mic ? "selected" : ""}>${esc(n)}</option>`).join("")}</select>
-      ${!S.obs.connected ? `<p class="muted small" style="margin-top:6px">${t("Seznam se načte, až bude OBS připojené.", "The list loads once OBS is connected.")}</p>` : ""}
-    </div>
-  </div>
-  <div class="card">
-    <h2>${t("Klipy", "Clips")}</h2>
+    <h2>${chip("scissors")}${t("Klipy", "Clips")}</h2>
     <p class="soft">${t("Klip je posledních pár vteřin, které OBS drží v paměti (v OBS se to jmenuje „Záznam do paměti“). Délku nastavíš v OBS: Nastavení → Výstup → Záznam do paměti → zaškrtni „Povolit záznam do paměti“ a zvol třeba 30 s.", "A clip is the last few seconds OBS keeps in memory (Replay Buffer). Set the length in OBS: Settings → Output → Replay Buffer → tick “Enable” and choose e.g. 30 s.")}</p>
-    <label class="check"><input type="checkbox" id="autoreplay" ${o.autoReplay ? "checked" : ""} /><span>${t("Zapínat záznam do paměti automaticky, když se aplikace připojí k OBS", "Start the Replay Buffer automatically when the app connects to OBS")}</span></label>
-    <label class="f" style="margin-top:8px">${t("Klipy se ukládají do", "Clips are saved to")}</label>
-    <div class="row"><div class="path" style="flex:1">${esc(S.config.clipsDir)}</div><button class="btn" id="pickdir">📁 ${t("Změnit", "Change")}</button></div>
+    <label class="check" style="margin-top:8px"><input type="checkbox" id="autoreplay" ${o.autoReplay ? "checked" : ""} /><span>${t("Zapínat záznam do paměti automaticky, když se aplikace připojí k OBS", "Start the Replay Buffer automatically when the app connects to OBS")}</span></label>
+    <label class="f" style="margin-top:12px">${t("Klipy se ukládají do", "Clips are saved to")}</label>
+    <div class="row"><div class="path" style="flex:1">${esc(S.config.clipsDir)}</div><button class="btn" id="pickdir">${ic("folder")} ${t("Změnit", "Change")}</button><button class="btn ghost" data-run="open_clips">${t("Otevřít", "Open")}</button></div>
   </div>`;
 }
 
@@ -232,7 +297,7 @@ function voiceLabel() {
     off: ["", t("Vypnuto", "Off")],
     loading: ["warn", t("Připravuji rozpoznávání… (poprvé to trvá až půl minuty)", "Preparing recognition… (the first time takes up to half a minute)")],
     listening: ["ok", t("Poslouchám", "Listening")],
-    nophrases: ["warn", t("Žádný příkaz nemá větu pro hlas. Doplň ji v záložce Příkazy.", "No command has a voice phrase. Add one in the Commands tab.")],
+    nophrases: ["warn", t("Žádný příkaz nemá větu pro hlas. Doplň ji v části Příkazy a zkratky.", "No command has a voice phrase. Add one under Commands & hotkeys.")],
     error: ["bad", mic ? t("Nejde použít mikrofon. Zkontroluj ve Windows: Nastavení → Soukromí a zabezpečení → Mikrofon → povolit aplikacím pro stolní počítače.", "Can't use the microphone. Check Windows: Settings → Privacy & security → Microphone → allow desktop apps.") : /^model/.test(v.error) ? t("Chybí hlasový model pro tenhle jazyk.", "The voice model for this language is missing.") : t("Rozpoznávání spadlo. Vypni ho a zapni.", "Recognition crashed. Turn it off and on.")],
   }[v.status] || ["", v.status];
 }
@@ -272,9 +337,10 @@ function tabVoice() {
   const withPhrase = S.config.commands.filter((x) => x.phrase);
   const fresh = v.heard && Date.now() - v.heardAt < 60000;
   return `<div class="head"><h1>${t("Hlasové povely", "Voice commands")}</h1><p class="muted">${t("Řekneš větu a aplikace udělá akci. Rozpoznávání běží jen v tvém počítači, hlas se nikam neposílá.", "Say a phrase and the app does the action. Recognition runs on your computer only; your voice is never sent anywhere.")}</p></div>
-  <div class="card">
+  <div class="card ${c.enabled && v.status === "listening" ? "glow" : ""}">
+    <h2>${chip("wave")}${t("Poslouchání", "Listening")}<span class="tag ${dot === "ok" ? "ok" : ""}"><span class="dot ${dot}"></span>${dot === "ok" ? t("běží", "on") : c.enabled ? t("připravuji", "starting") : t("vypnuto", "off")}</span></h2>
     <label class="check"><input type="checkbox" id="voiceon" ${c.enabled ? "checked" : ""} /><span><b>${t("Poslouchat hlasové povely", "Listen for voice commands")}</b></span></label>
-    <p style="margin-top:8px"><span class="dot ${dot}" style="display:inline-block;margin-right:8px"></span>${label}</p>
+    <p class="soft small" style="margin-top:2px">${label}</p>
     ${v.status === "error" && v.error ? `<p class="muted small" style="margin-top:4px">${t("Podrobnosti", "Details")}: ${esc(v.error)}</p>` : ""}
     <div class="two" style="margin-top:14px">
       <div><label class="f">${t("Mikrofon", "Microphone")}</label><select id="voicemic"><option value="">${t("Výchozí mikrofon systému", "System default microphone")}</option>${v.devices.filter((d) => d.id && d.id !== "default").map((d) => `<option value="${esc(d.id)}" ${d.id === c.deviceId ? "selected" : ""}>${esc(d.name)}</option>`).join("")}</select></div>
@@ -285,10 +351,10 @@ function tabVoice() {
       <div><label class="f">${t("Jak moc si musí být jistý", "How sure it must be")}</label><select id="voicestrict">${[[60, t("Méně (reaguje snadno)", "Less (reacts easily)")], [75, t("Běžně", "Normal")], [90, t("Hodně (méně omylů)", "A lot (fewer mistakes)")]].map(([n, l]) => `<option value="${n}" ${(c.strict || 75) === n ? "selected" : ""}>${l}</option>`).join("")}</select></div>
     </div>
     <label class="check" style="margin-top:12px"><input type="checkbox" id="voicewakeon" ${c.wake === false ? "" : "checked"} /><span><b>${t("Povel musí začínat oslovením", "A command must start with the wake word")}</b><br /><span class="muted small">${t(`Řekneš „${wakeName()} udělej klip“. Bez oslovení se nic nespustí, takže běžná řeč na streamu nevadí.`, `You say “${wakeName()} make a clip”. Nothing runs without the wake word, so normal talk on stream is fine.`)}</span></span></label>
-    ${c.enabled && c.wake !== false && v.status === "listening" && !v.wakes.length ? `<p class="error">⚠ ${t("Tohle oslovení hlasový model nezná. Zvol jiné, běžné slovo (třeba „počítači“).", "The voice model doesn't know this wake word. Pick a common word (like “computer”).")}</p>` : ""}
+    ${c.enabled && c.wake !== false && v.status === "listening" && !v.wakes.length ? `<div class="note">${ic("alert")}<span>${t("Tohle oslovení hlasový model nezná. Zvol jiné, běžné slovo (třeba „počítači“).", "The voice model doesn't know this wake word. Pick a common word (like “computer”).")}</span></div>` : ""}
   </div>
   <div class="card">
-    <h2>${t("Zkouška mikrofonu", "Microphone test")}</h2>
+    <h2>${chip("headphones", "cyan")}${t("Zkouška mikrofonu", "Microphone test")}</h2>
     ${
       v.status !== "listening"
         ? `<p class="muted">${t("Nejdřív nahoře zapni poslouchání.", "Turn listening on above first.")}</p>`
@@ -298,7 +364,7 @@ function tabVoice() {
       <button class="btn sm" id="voicecalib" ${v.calib === "run" ? "disabled" : ""}>${v.calib === "run" ? t("Mluv… (4 vteřiny)", "Speak… (4 seconds)") : t("Nastavit hlasitost mikrofonu", "Set microphone volume")}</button>
       <button class="btn sm ${v.test ? "primary" : ""}" id="voicetest">${v.test ? t("Ukončit zkoušku", "End test") : t("Zkoušet povely (nic se nespustí)", "Try commands (nothing runs)")}</button>
     </div>
-    ${v.calib === "ok" ? `<p class="muted small" style="margin-top:8px">✓ ${t("Hlasitost nastavena.", "Volume set.")}</p>` : v.calib === "silent" ? `<p class="error" style="margin-top:8px">${t("Nic jsem neslyšel. Je vybraný správný mikrofon a není ztlumený?", "I heard nothing. Is the right microphone selected and not muted?")}</p>` : v.calib === "run" ? `<p class="muted small" style="margin-top:8px">${t(`Říkej třeba: „${wakeName()} ${esc((withPhrase[0] || {}).phrase || "")}“`, `Say for example: “${wakeName()} ${esc((withPhrase[0] || {}).phrase || "")}”`)}</p>` : ""}
+    ${v.calib === "ok" ? `<p class="muted small" style="margin-top:8px">${ic("check")} ${t("Hlasitost nastavena.", "Volume set.")}</p>` : v.calib === "silent" ? `<p class="error" style="margin-top:8px">${t("Nic jsem neslyšel. Je vybraný správný mikrofon a není ztlumený?", "I heard nothing. Is the right microphone selected and not muted?")}</p>` : v.calib === "run" ? `<p class="muted small" style="margin-top:8px">${t(`Říkej třeba: „${wakeName()} ${esc((withPhrase[0] || {}).phrase || "")}“`, `Say for example: “${wakeName()} ${esc((withPhrase[0] || {}).phrase || "")}”`)}</p>` : ""}
     ${
       v.test
         ? `<p style="margin-top:12px">${t("Řekni postupně každý povel. Uvidíš, co aplikace slyšela:", "Say each command in turn. You'll see what the app heard:")}</p>
@@ -308,21 +374,22 @@ function tabVoice() {
     }
   </div>
   <div class="card">
-    <h2>${t("Co naposledy slyšel", "Last heard")}</h2>
+    <h2>${chip("search", "cyan")}${t("Co naposledy slyšel", "Last heard")}</h2>
     ${fresh && v.log[0] ? `<ul class="clips">${heardRow(v.log[0])}</ul>` : `<p class="muted">${t("Zatím nic. Zkus říct některou větu níže.", "Nothing yet. Try saying one of the phrases below.")}</p>`}
   </div>
   <div class="card">
-    <div class="row sp"><h2>${t("Věty, na které slyší", "Phrases it listens for")}</h2><button class="btn sm" data-tab="cmds">${t("Upravit v Příkazech", "Edit in Commands")}</button></div>
+    <div class="row sp" style="margin-bottom:12px"><h2 style="margin:0">${chip("keyboard")}${t("Věty, na které slyší", "Phrases it listens for")}</h2><button class="btn sm" data-tab="cmds">${t("Upravit v Příkazech", "Edit in Commands")} ›</button></div>
     ${
       withPhrase.length
         ? `<ul class="clips">${withPhrase.map((x) => `<li><span><b>„${S.config.voice.wake === false ? "" : `${wakeName()} `}${esc(x.phrase)}“</b></span><span class="muted small">${esc(t((S.actions.find((a) => a.key === x.action) || {}).cs || "", (S.actions.find((a) => a.key === x.action) || {}).en || ""))}${x.param ? `: ${esc(x.param)}` : ""}</span></li>`).join("")}</ul>`
-        : `<p class="muted">${t("Žádná. V záložce Příkazy doplň u příkazu „Větu pro hlas“.", "None. Add a “Voice phrase” to a command in the Commands tab.")}</p>`
+        : `<p class="muted">${t("Žádná. V části Příkazy a zkratky doplň u příkazu „Větu pro hlas“.", "None. Add a “Voice phrase” to a command under Commands & hotkeys.")}</p>`
     }
-    ${similarPhrases().map(([a, b]) => `<p class="error">⚠ ${t(`Povely „${esc(a)}“ a „${esc(b)}“ znějí skoro stejně a budou se plést. Jeden z nich přepiš jinými slovy.`, `The commands “${esc(a)}” and “${esc(b)}” sound almost the same and will get mixed up. Reword one of them.`)}</p>`).join("")}
-    ${v.unknown.length ? `<p class="error">⚠ ${t("Tahle slova hlasový model nezná, věta s nimi nebude fungovat. Zkus jiné slovo:", "The voice model doesn't know these words, so phrases with them won't work. Try another word:")} <b>${v.unknown.map(esc).join(", ")}</b></p>` : ""}
+    ${similarPhrases().map(([a, b]) => `<div class="note">${ic("alert")}<span>${t(`Povely „${esc(a)}“ a „${esc(b)}“ znějí skoro stejně a budou se plést. Jeden z nich přepiš jinými slovy.`, `The commands “${esc(a)}” and “${esc(b)}” sound almost the same and will get mixed up. Reword one of them.`)}</span></div>`).join("")}
+    ${v.unknown.length ? `<div class="note">${ic("alert")}<span>${t("Tahle slova hlasový model nezná, věta s nimi nebude fungovat. Zkus jiné slovo:", "The voice model doesn't know these words, so phrases with them won't work. Try another word:")} <b>${v.unknown.map(esc).join(", ")}</b></span></div>` : ""}
   </div>
   <div class="card">
-    <h2>${t("Tipy", "Tips")}</h2>
+    <details class="more" style="border:0;margin:0;padding:0">
+    <summary>${chip("bulb", "gold")} ${t("Tipy pro spolehlivé povely", "Tips for reliable commands")}</summary>
     <ol class="steps">
       <li>${t("Povel má nejvýš 3 slova. Dvě slova jsou spolehlivější než jedno („udělej klip“ místo „klip“).", "A command has at most 3 words. Two words are more reliable than one (“make a clip” rather than “clip”).")}</li>
       <li>${t("Oslovení a povel řekni vcelku, nebo po oslovení udělej krátkou pauzu (do 5 vteřin).", "Say the wake word and the command together, or pause briefly after the wake word (up to 5 seconds).")}</li>
@@ -330,6 +397,7 @@ function tabVoice() {
       <li>${t("Piš věty běžnými slovy s háčky a čárkami, bez číslic (místo „2“ napiš „dva“).", "Write phrases in ordinary words, no digits (write “two” instead of “2”).")}</li>
       <li>${t("Každá věta ať zní jinak. Dvě podobné věty si aplikace může splést.", "Make each phrase sound different. Two similar phrases can get mixed up.")}</li>
     </ol>
+    </details>
   </div>`;
 }
 
@@ -371,98 +439,112 @@ async function loadMic() {
   }
   if (tab === "mic") render();
 }
+let msub = "preset"; // část stránky Zvuk mikrofonu
+function micInput() {
+  const o = S.config.obs;
+  return `<div class="card">
+    <h2>${chip("mic")}${t("Tvůj mikrofon v OBS", "Your microphone in OBS")}</h2>
+    <select id="mic"><option value="">${t("– vyber zdroj zvuku z OBS –", "– pick an OBS audio source –")}</option>${[...new Set([...lists.inputs, o.mic].filter(Boolean))].map((n) => `<option ${n === o.mic ? "selected" : ""}>${esc(n)}</option>`).join("")}</select>
+    <p class="muted small" style="margin-top:6px">${S.obs.connected ? t("Na tenhle zdroj se dávají presety a funguje na něj i zkratka pro ztlumení.", "Presets go on this source, and the mute hotkey works on it too.") : t("Seznam se načte, až bude OBS připojené.", "The list loads once OBS is connected.")}</p>
+  </div>`;
+}
 function tabMic() {
-  const head = `<div class="head"><h1>${t("Mikrofon", "Microphone")}</h1><p class="muted">${t("Presety zvuku mikrofonu. Aplikace je nastaví jako filtry přímo v OBS, takže platí pro stream a nahrávky. Fungují i s vypnutou aplikací.", "Microphone sound presets. The app sets them as filters right in OBS, so they apply to your stream and recordings. They keep working with the app closed.")}</p></div>`;
-  if (!M) return `${head}<div class="card"><p class="muted">${t("Načítám…", "Loading…")}</p></div>`;
-  if (!M.ready) return `${head}<div class="card"><p class="error">${esc(M.error)}</p><p class="muted small" style="margin-top:6px">${t("Mikrofon vybereš v záložce OBS.", "Pick your microphone in the OBS tab.")}</p><div style="margin-top:10px"><button class="btn sm" data-tab="obs">${t("Otevřít záložku OBS", "Open the OBS tab")}</button> <button class="btn sm" id="micreload">${t("Zkusit znovu", "Try again")}</button></div></div>`;
+  const head = `<div class="head"><h1>${t("Zvuk mikrofonu", "Microphone sound")}</h1><p class="muted">${t("Presety zvuku mikrofonu. Aplikace je nastaví jako filtry přímo v OBS, takže platí pro stream i nahrávky a fungují i s vypnutou aplikací.", "Microphone sound presets. The app sets them as filters right in OBS, so they apply to your stream and recordings and keep working with the app closed.")}</p></div>`;
+  if (!M) return `${head}${micInput()}<div class="card"><p class="muted">${t("Načítám…", "Loading…")}</p></div>`;
+  if (!M.ready) return `${head}${micInput()}<div class="card warnc"><div class="note" style="margin-top:0">${ic("alert")}<span>${esc(M.error)}</span></div><div style="margin-top:12px"><button class="btn sm" id="micreload">${ic("refresh")} ${t("Zkusit znovu", "Try again")}</button></div></div>`;
   const state = M.applied ? (M.bypass ? ["warn", t("Preset je v OBS, ale teď je vypnutý (porovnání)", "The preset is in OBS but currently off (comparison)")] : ["ok", t("Preset je v OBS zapnutý", "The preset is on in OBS")]) : ["", t("V OBS zatím žádný preset není", "No preset in OBS yet")];
   const slider = (f) =>
     f.type === "bool"
       ? `<label class="check" style="grid-column:1/-1"><input type="checkbox" data-mic="${f.key}" ${mv[f.key] ? "checked" : ""} /><span><b>${esc(t(f.cs, f.en))}</b></span></label>`
-      : `<div><label class="f">${esc(t(f.cs, f.en))} <b data-micval="${f.key}" style="float:right">${mv[f.key]} ${f.unit}</b></label><input type="range" data-mic="${f.key}" min="${f.min}" max="${f.max}" step="${f.step}" value="${mv[f.key]}" style="width:100%" />${f.hintCs ? `<p class="muted small">${esc(t(f.hintCs, f.hintEn))}</p>` : ""}</div>`;
-  return `${head}
-  <div class="card">
-    <div class="row sp"><h2 style="margin:0"><span class="dot ${state[0]}" style="display:inline-block;margin-right:8px"></span>${state[1]}</h2><button class="btn sm" id="micreload">${t("Obnovit", "Refresh")}</button></div>
-    <h2 style="margin-top:16px">${t("1. Vyber preset", "1. Pick a preset")}</h2>
-    <div class="two">${M.presets
-      .map((p) => `<button class="btn" data-micpreset="${p.key}" style="justify-content:flex-start;text-align:left;${p.key === mpreset ? "border-color:var(--brand)" : ""}"><span><b>${esc(t(p.cs, p.en))}</b><br /><span class="muted small">${esc(t(p.descCs, p.descEn))}</span></span></button>`)
-      .join("")}</div>
-    ${P.mine.length ? `<h2 style="margin-top:14px;font-size:14px">${t("Moje uložené", "My saved")}</h2><div class="two">${P.mine.map(presetBtn).join("")}</div>` : ""}
-    <h2 style="margin-top:18px">${t("2. Dolaď si ho", "2. Fine-tune it")}</h2>
-    <div class="two">${M.fields.map(slider).join("")}</div>
-    <label class="check" style="margin-top:14px"><input type="checkbox" id="micothers" ${M.disableOthers ? "checked" : ""} /><span><b>${t("Vypnout moje ostatní filtry na mikrofonu", "Turn off my other microphone filters")}</b><br /><span class="muted small">${t(`Nesmažou se, jen se vypnou, ať se úpravy nesčítají. Teď jich tam máš: ${M.others}.`, `They aren't deleted, just turned off so effects don't stack. You have ${M.others} there now.`)}</span></span></label>
-    <h2 style="margin-top:18px">${t("3. Použij a poslechni si", "3. Apply and listen")}</h2>
-    <div class="row" style="gap:8px;flex-wrap:wrap">
-      <button class="btn primary" id="micapply">${M.applied ? t("Uložit změny do OBS", "Save changes to OBS") : t("Použít v OBS", "Apply in OBS")}</button>
-      <button class="btn ${M.monitoring ? "gold" : ""}" id="micmon">${M.monitoring ? t("Vypnout poslech", "Stop listening") : t("Poslech ve sluchátkách", "Listen in headphones")}</button>
+      : `<div><label class="f">${esc(t(f.cs, f.en))} <b data-micval="${f.key}">${mv[f.key]} ${f.unit}</b></label><input type="range" data-mic="${f.key}" min="${f.min}" max="${f.max}" step="${f.step}" value="${mv[f.key]}" />${f.hintCs ? `<p class="muted small">${esc(t(f.hintCs, f.hintEn))}</p>` : ""}</div>`;
+  const seg = [
+    ["preset", "sliders", t("Preset", "Preset")],
+    ["mine", "star", `${t("Moje presety", "My presets")} (${P.mine.length}/${P.max})`],
+    ["community", "globe", t("Komunitní", "Community")],
+    ["help", "info", t("Jak to vyzkoušet", "How to try it")],
+  ];
+  const body = {
+    preset: `<div class="card ${M.applied && !M.bypass ? "glow" : ""}">
+    <div class="row sp"><h2 style="margin:0">${chip("sliders")}${t("Preset", "Preset")}<span class="tag ${state[0] === "ok" ? "ok" : ""}"><span class="dot ${state[0]}"></span>${state[1]}</span></h2><button class="btn sm ghost" id="micreload">${ic("refresh")} ${t("Obnovit", "Refresh")}</button></div>
+    <h3 style="margin-top:18px">1 · ${t("Vyber preset", "Pick a preset")}</h3>
+    <div class="presets">${M.presets.map((p) => `<button class="preset ${p.key === mpreset ? "sel" : ""}" data-micpreset="${p.key}"><b>${esc(t(p.cs, p.en))}</b><span class="muted small">${esc(t(p.descCs, p.descEn))}</span></button>`).join("")}${P.mine.map(presetBtn).join("")}</div>
+    <h3 style="margin-top:20px">2 · ${t("Dolaď si ho", "Fine-tune it")}</h3>
+    <div class="sliders">${M.fields.map(slider).join("")}</div>
+    <label class="check" style="margin-top:12px"><input type="checkbox" id="micothers" ${M.disableOthers ? "checked" : ""} /><span><b>${t("Vypnout moje ostatní filtry na mikrofonu", "Turn off my other microphone filters")}</b><br /><span class="muted small">${t(`Nesmažou se, jen se vypnou, ať se úpravy nesčítají. Teď jich tam máš: ${M.others}.`, `They aren't deleted, just turned off so effects don't stack. You have ${M.others} there now.`)}</span></span></label>
+    <h3 style="margin-top:20px">3 · ${t("Použij a poslechni si", "Apply and listen")}</h3>
+    <div class="row" style="gap:8px">
+      <button class="btn primary" id="micapply">${ic("check")} ${M.applied ? t("Uložit změny do OBS", "Save changes to OBS") : t("Použít v OBS", "Apply in OBS")}</button>
+      <button class="btn ${M.monitoring ? "gold" : ""}" id="micmon">${ic("headphones")} ${M.monitoring ? t("Vypnout poslech", "Stop listening") : t("Poslech ve sluchátkách", "Listen in headphones")}</button>
       <button class="btn" id="micab" ${M.applied ? "" : "disabled"}>${M.bypass ? t("Zapnout preset", "Turn preset on") : t("Porovnat: bez presetu", "Compare: without preset")}</button>
       <button class="btn danger" id="micrevert" ${M.applied ? "" : "disabled"}>${t("Vrátit zpět", "Revert")}</button>
     </div>
-    <p class="muted small" style="margin-top:8px">${M.applied ? t("Posuvníky teď mění zvuk v OBS hned, jak s nimi pohneš.", "The sliders now change the sound in OBS as you move them.") : t("Dokud nedáš „Použít v OBS“, v OBS se nic nemění.", "Nothing changes in OBS until you click “Apply in OBS”.")}</p>
-  </div>
-  ${tabPresets()}
-  <div class="card">
-    <h2>${t("Jak si to vyzkoušet", "How to try it")}</h2>
+    <p class="muted small" style="margin-top:10px">${M.applied ? t("Posuvníky teď mění zvuk v OBS hned, jak s nimi pohneš.", "The sliders now change the sound in OBS as you move them.") : t("Dokud nedáš „Použít v OBS“, v OBS se nic nemění.", "Nothing changes in OBS until you click “Apply in OBS”.")}</p>
+  </div>`,
+    mine: tabPresets("mine"),
+    community: tabPresets("community"),
+    help: `<div class="card">
+    <h2>${chip("bulb", "gold")}${t("Jak si to vyzkoušet", "How to try it")}</h2>
     <ol class="steps">
       <li>${t("Nasaď si sluchátka a klikni „Poslech ve sluchátkách“. Uslyšíš svůj mikrofon přes OBS.", "Put on headphones and click “Listen in headphones”. You'll hear your microphone through OBS.")}</li>
       <li>${t("Klikni „Použít v OBS“ a mluv. Posuvníky mění zvuk hned.", "Click “Apply in OBS” and talk. The sliders change the sound right away.")}</li>
       <li>${t("Tlačítkem „Porovnat“ přepínáš mezi zvukem bez presetu a s ním.", "Use “Compare” to switch between the sound without and with the preset.")}</li>
       <li>${t("Nelíbí se? „Vrátit zpět“ smaže jen filtry od TejBota a zapne ty tvoje. Mikrofon bude jako předtím.", "Don't like it? “Revert” removes only TejBot's filters and turns yours back on. The microphone is as before.")}</li>
     </ol>
-    <p class="muted small">${t("Pozor při živém vysílání: změny jdou rovnou do streamu. Zkoušej raději mimo stream, nebo si pusť nahrávání a poslechni si záznam. Když poslech neslyšíš, nastav v OBS Nastavení → Zvuk → Zařízení pro odposlech.", "Careful when live: changes go straight to the stream. Rather try it off stream, or record and listen back. If you can't hear the monitoring, set OBS Settings → Audio → Monitoring Device.")}</p>
-    <p class="muted small" style="margin-top:6px">${t("Filtry najdeš v OBS: pravým tlačítkem na mikrofon → Filtry. Začínají slovem TejBot. Presety jsou výchozí bod, konečný zvuk záleží na místnosti, vzdálenosti od mikrofonu a zisku na zvukovce.", "Find the filters in OBS: right-click the microphone → Filters. They start with TejBot. Presets are a starting point; the final sound depends on your room, mic distance and interface gain.")}</p>
-  </div>`;
+    <div class="note">${ic("alert")}<span>${t("Pozor při živém vysílání: změny jdou rovnou do streamu. Zkoušej raději mimo stream, nebo si pusť nahrávání a poslechni si záznam. Když poslech neslyšíš, nastav v OBS Nastavení → Zvuk → Zařízení pro odposlech.", "Careful when live: changes go straight to the stream. Rather try it off stream, or record and listen back. If you can't hear the monitoring, set OBS Settings → Audio → Monitoring Device.")}</span></div>
+    <p class="muted small" style="margin-top:10px">${t("Filtry najdeš v OBS: pravým tlačítkem na mikrofon → Filtry. Začínají slovem TejBot. Presety jsou výchozí bod, konečný zvuk záleží na místnosti, vzdálenosti od mikrofonu a zisku na zvukovce.", "Find the filters in OBS: right-click the microphone → Filters. They start with TejBot. Presets are a starting point; the final sound depends on your room, mic distance and interface gain.")}</p>
+  </div>`,
+  }[msub];
+  return `${head}${micInput()}<div class="seg">${seg.map(([k, i, n]) => `<button data-msub="${k}" class="${k === msub ? "on" : ""}">${ic(i)}${n}</button>`).join("")}</div>${body}`;
 }
 
 function presetBtn(p) {
-  const meta = [p.mine ? (p.public ? t("tvůj, veřejný", "yours, public") : t("tvůj, soukromý", "yours, private")) : p.author, catName(p.category), p.microphone].filter(Boolean).map(esc).join(" · ");
-  return `<button class="btn" data-mypreset="${esc(p.id)}" style="justify-content:flex-start;text-align:left;${`p:${p.id}` === mpreset ? "border-color:var(--brand)" : ""}"><span><b>${p.mine ? "⭐ " : ""}${esc(p.name)}</b><br /><span class="muted small">${meta}</span></span></button>`;
+  const meta = [p.mine ? (p.public ? t("tvůj, veřejný", "yours, public") : t("tvůj, soukromý", "yours, private")) : p.author, catName(p.category), p.microphone, !p.mine && p.uses ? `${t("použito", "used")} ${p.uses}×` : ""].filter(Boolean).map(esc).join(" · ");
+  return `<button class="preset ${`p:${p.id}` === mpreset ? "sel" : ""}" data-mypreset="${esc(p.id)}"><b>${p.mine ? "★ " : ""}${esc(p.name)}</b><span class="muted small">${meta}</span></button>`;
 }
-function tabPresets() {
+function tabPresets(part) {
   const own = ownPreset();
   const full = P.mine.length >= P.max;
   const catSel = (id, val, any) => `<select id="${id}">${any ? `<option value="">${t("Všechny kategorie", "All categories")}</option>` : ""}${CATS().map(([k, n]) => `<option value="${k}" ${k === val ? "selected" : ""}>${esc(n)}</option>`).join("")}</select>`;
-  return `<div class="card">
-    <div class="row sp"><h2 style="margin:0">${t("Moje presety", "My presets")} <span class="muted small">(${P.mine.length}/${P.max})</span></h2></div>
-    <p class="muted small" style="margin-top:4px">${t("Ulož si, co máš teď nastavené na posuvnících. Výchozí presety zůstanou, jak jsou. Presety se ukládají k tvému kanálu na webu, takže je máš i na jiném počítači.", "Save what you have on the sliders right now. The built-in presets stay as they are. Presets are stored with your channel on the website, so you have them on other computers too.")}</p>
+  if (part === "mine")
+    return `<div class="card">
+    <h2>${chip("star", "gold")}${t("Moje presety", "My presets")} <span class="tag">${P.mine.length}/${P.max}</span></h2>
+    <p class="muted small">${t("Ulož si, co máš teď nastavené na posuvnících. Výchozí presety zůstanou, jak jsou. Presety se ukládají k tvému kanálu na webu, takže je máš i na jiném počítači.", "Save what you have on the sliders right now. The built-in presets stay as they are. Presets are stored with your channel on the website, so you have them on other computers too.")}</p>
     ${P.error ? `<p class="error">${esc(P.error)}</p>` : ""}
     ${
       P.mine.length
         ? `<ul class="clips" style="margin-top:10px">${P.mine
             .map(
               (p) => `<li><span><b>${esc(p.name)}</b> <span class="tag ${p.public ? "gold" : ""}">${p.public ? t("veřejný", "public") : t("soukromý", "private")}</span><br /><span class="muted small">${[catName(p.category), p.microphone].filter(Boolean).map(esc).join(" · ")}${p.public ? ` · ${t("použito", "used")} ${p.uses}×` : ""}</span></span>
-              <span class="row" style="gap:4px"><button class="btn sm" data-mypreset="${esc(p.id)}">${t("Načíst", "Load")}</button><button class="btn sm" data-pubtoggle="${esc(p.id)}">${p.public ? t("Skrýt", "Make private") : t("Zveřejnit", "Publish")}</button><button class="btn sm danger" data-pdel="${esc(p.id)}" title="${t("Smazat", "Delete")}">✕</button></span></li>`
+              <span class="row" style="gap:6px"><button class="btn sm" data-mypreset="${esc(p.id)}">${t("Načíst", "Load")}</button><button class="btn sm ghost" data-pubtoggle="${esc(p.id)}">${p.public ? t("Skrýt", "Make private") : t("Zveřejnit", "Publish")}</button><button class="btn sm icon danger" data-pdel="${esc(p.id)}" title="${t("Smazat", "Delete")}">${ic("trash")}</button></span></li>`
             )
             .join("")}</ul>`
-        : P.loaded ? `<p class="muted" style="margin-top:8px">${t("Zatím žádný.", "None yet.")}</p>` : `<p class="muted" style="margin-top:8px">${t("Načítám…", "Loading…")}</p>`
+        : P.loaded ? `<div class="empty">${chip("star", "gold")}<p>${t("Zatím žádný.", "None yet.")}</p></div>` : `<p class="muted" style="margin-top:8px">${t("Načítám…", "Loading…")}</p>`
     }
-    <h2 style="margin-top:16px;font-size:14px">${own ? t(`Uložit nastavení (teď máš načtený „${esc(own.name)}“)`, `Save settings (you have “${esc(own.name)}” loaded)`) : t("Uložit současné nastavení jako preset", "Save the current settings as a preset")}</h2>
+    <h3 style="margin-top:18px">${own ? t(`Uložit nastavení (teď máš načtený „${esc(own.name)}“)`, `Save settings (you have “${esc(own.name)}” loaded)`) : t("Uložit současné nastavení jako preset", "Save the current settings as a preset")}</h3>
     <div class="two">
       <div><label class="f">${t("Název", "Name")}</label><input type="text" id="pname" maxlength="40" value="${esc(pform.name)}" placeholder="${t("např. Večerní stream", "e.g. Evening stream")}" /></div>
       <div><label class="f">${t("Mikrofon (nepovinné)", "Microphone (optional)")}</label><input type="text" id="pmic" maxlength="60" value="${esc(pform.microphone)}" placeholder="${t("např. Rode NT1-A, Shure SM7B", "e.g. Rode NT1-A, Shure SM7B")}" /></div>
       <div><label class="f">${t("Kategorie", "Category")}</label>${catSel("pcat", pform.category, false)}</div>
-      <div><label class="check" style="margin-top:22px"><input type="checkbox" id="ppublic" ${pform.public ? "checked" : ""} /><span><b>${t("Veřejný", "Public")}</b> <span class="muted small">${t("najdou ho i ostatní streameři", "other streamers can find it")}</span></span></label></div>
+      <div><label class="check" style="margin-top:20px"><input type="checkbox" id="ppublic" ${pform.public ? "checked" : ""} /><span><b>${t("Veřejný", "Public")}</b> <span class="muted small">${t("najdou ho i ostatní streameři", "other streamers can find it")}</span></span></label></div>
     </div>
-    <div class="row" style="gap:8px;margin-top:12px;flex-wrap:wrap">
+    <div class="row" style="gap:8px;margin-top:14px">
       ${own ? `<button class="btn primary" id="poverwrite">${t(`Přepsat „${esc(own.name)}“`, `Overwrite “${esc(own.name)}”`)}</button>` : ""}
-      <button class="btn ${own ? "" : "primary"}" id="psave" ${full ? "disabled" : ""}>${t("Uložit jako nový", "Save as new")}</button>
+      <button class="btn ${own ? "" : "primary"}" id="psave" ${full ? "disabled" : ""}>${ic("plus")} ${t("Uložit jako nový", "Save as new")}</button>
       ${full ? `<span class="muted small">${t("Máš plno (3/3). Některý smaž, nebo načti a přepiš.", "You're full (3/3). Delete one, or load and overwrite it.")}</span>` : ""}
     </div>
-  </div>
-  <div class="card">
-    <h2>${t("Komunitní presety", "Community presets")}</h2>
-    <p class="muted small">${t("Veřejné presety streamerů, i tvoje (⭐). Hledej podle názvu nebo mikrofonu. Načtený preset si dolaď a ulož jako svůj.", "Public presets from streamers, yours included (⭐). Search by name or microphone. Fine-tune a loaded preset and save it as yours.")}</p>
-    <div class="two" style="margin-top:10px">
-      <div><label class="f">${t("Hledat (název nebo mikrofon)", "Search (name or microphone)")}</label><input type="text" id="pq" maxlength="60" value="${esc(pq)}" placeholder="${t("např. SM7B", "e.g. SM7B")}" /></div>
-      <div><label class="f">${t("Kategorie", "Category")}</label>${catSel("pqcat", pcat, true)}</div>
+  </div>`;
+  return `<div class="card">
+    <h2>${chip("globe", "cyan")}${t("Komunitní presety", "Community presets")}</h2>
+    <p class="muted small">${t("Veřejné presety streamerů, i tvoje (★). Hledej podle názvu nebo mikrofonu. Načtený preset si dolaď na záložce Preset a ulož jako svůj.", "Public presets from streamers, yours included (★). Search by name or microphone. Fine-tune a loaded preset on the Preset tab and save it as yours.")}</p>
+    <div class="row" style="margin-top:12px;flex-wrap:nowrap">
+      <div style="flex:1.4"><input type="text" id="pq" maxlength="60" value="${esc(pq)}" placeholder="${t("Hledat název nebo mikrofon (např. SM7B)", "Search name or microphone (e.g. SM7B)")}" /></div>
+      <div style="flex:1">${catSel("pqcat", pcat, true)}</div>
+      <button class="btn" id="psearch" ${P.loading ? "disabled" : ""}>${ic("search")} ${t("Hledat", "Search")}</button>
     </div>
-    <div style="margin-top:10px"><button class="btn" id="psearch" ${P.loading ? "disabled" : ""}>🔍 ${t("Hledat", "Search")}</button></div>
     ${
       P.list.length
-        ? `<div class="two" style="margin-top:12px">${P.list
-            .map((p) => presetBtn(p).replace("</span></span></button>", `${p.uses ? ` · ${t("použito", "used")} ${p.uses}×` : ""}</span></span></button>`))
-            .join("")}</div>`
-        : P.loaded ? `<p class="muted" style="margin-top:10px">${t("Nic nenalezeno. Buď první, kdo sem dá svůj preset.", "Nothing found. Be the first to share yours.")}</p>` : ""
+        ? `<div class="presets" style="margin-top:14px">${P.list.map(presetBtn).join("")}</div>`
+        : P.loaded ? `<div class="empty">${chip("globe", "cyan")}<p>${t("Nic nenalezeno. Buď první, kdo sem dá svůj preset.", "Nothing found. Be the first to share yours.")}</p></div>` : ""
     }
   </div>`;
 }
@@ -476,40 +558,38 @@ function tabMusic() {
     ["other", t("Ostatní aplikace (přehrávače videa, hry…)", "Other apps (video players, games…)")],
   ];
   const tr = S.track;
-  return `<div class="head"><h1>${t("Hudba", "Music")}</h1><p class="muted">${t("Widget „Co poslouchám“ ve streamu ukazuje skladbu, která ti zrovna hraje.", "The “Listening to” stream widget shows the track you're playing.")}</p></div>
-  ${!S.musicAvailable ? `<div class="card"><p class="soft">⚠ ${S.platform === "linux" ? t("Na Linuxu je potřeba program playerctl. Nainstaluj ho (např. sudo apt install playerctl) a aplikaci spusť znovu.", "On Linux this needs the playerctl program. Install it (e.g. sudo apt install playerctl) and restart the app.") : t("Na tomhle systému zjišťování hudby nefunguje.", "Music detection isn't available on this system.")}</p></div>` : ""}
-  <div class="card">
+  return `<div class="head"><h1>${t("Hudba ve streamu", "Music on stream")}</h1><p class="muted">${t("Widget „Co poslouchám“ ve streamu ukazuje skladbu, která ti zrovna hraje.", "The “Listening to” stream widget shows the track you're playing.")}</p></div>
+  ${!S.musicAvailable ? `<div class="card warnc"><p class="soft">${S.platform === "linux" ? t("Na Linuxu je potřeba program playerctl. Nainstaluj ho (např. sudo apt install playerctl) a aplikaci spusť znovu.", "On Linux this needs the playerctl program. Install it (e.g. sudo apt install playerctl) and restart the app.") : t("Na tomhle systému zjišťování hudby nefunguje.", "Music detection isn't available on this system.")}</p></div>` : ""}
+  <div class="card ${m.enabled ? "glow" : ""}">
+    <h2>${chip("music")}${t("Widget „Co poslouchám“", "“Listening to” widget")}</h2>
     <label class="check"><input type="checkbox" id="musicon" ${m.enabled ? "checked" : ""} /><span><b>${t("Posílat do streamu, co poslouchám", "Send what I'm listening to to the stream")}</b><br /><span class="muted small">${t("Na web jde jen název skladby, interpret a název aplikace.", "Only the track title, artist and app name go to the website.")}</span></span></label>
-    <h2 style="margin-top:14px">${t("Odkud se smí hudba brát", "Allowed sources")}</h2>
+    <h3 style="margin-top:16px">${t("Odkud se smí hudba brát", "Allowed sources")}</h3>
     ${src.map(([k, n]) => `<label class="check"><input type="checkbox" data-src="${k}" ${m.sources[k] ? "checked" : ""} /><span>${n}</span></label>`).join("")}
     <p class="muted small" style="margin-top:6px">${t("Prohlížeč ukáže cokoli, co v něm hraje se zvukem, tedy i video. Když to nechceš, nech zapnuté jen Spotify a Apple Music.", "The browser shows anything playing with sound, including videos. If you don't want that, keep only Spotify and Apple Music on.")}</p>
   </div>
   <div class="card">
-    <h2>${t("Právě teď", "Right now")}</h2>
-    <p>${tr ? `<b>${esc(tr.title)}</b>${tr.artist ? ` · ${esc(tr.artist)}` : ""}${tr.app ? ` <span class="tag">${esc(tr.app)}</span>` : ""}` : `<span class="muted">${t("Nic nehraje.", "Nothing is playing.")}</span>`}</p>
+    <h2>${chip("headphones", "cyan")}${t("Právě teď", "Right now")}</h2>
+    <p style="font-size:15px">${tr ? `<b>${esc(tr.title)}</b>${tr.artist ? ` <span class="soft">· ${esc(tr.artist)}</span>` : ""}${tr.app ? ` <span class="tag">${esc(tr.app)}</span>` : ""}` : `<span class="muted">${t("Nic nehraje.", "Nothing is playing.")}</span>`}</p>
     <p class="muted small" style="margin-top:10px">${t("Odkaz na widget do OBS najdeš na webu:", "Find the OBS widget link on the website:")} <a data-open="/dashboard/${esc(S.config.channel.id)}/assistant">${t("Aplikace do PC", "Desktop app")}</a></p>
   </div>`;
 }
 
 function tabSettings() {
-  return `<div class="head"><h1>${t("Nastavení", "Settings")}</h1></div>
+  return `<div class="head"><h1>${t("Nastavení", "Settings")}</h1><p class="muted">${t("Spouštění, jazyk, aktualizace a propojení s kanálem. Složku s klipy najdeš v OBS a klipy.", "Startup, language, updates and the channel link. The clips folder is under OBS & clips.")}</p></div>
   <div class="card">
-    <h2>${t("Složka s klipy", "Clips folder")}</h2>
-    <div class="row"><div class="path" style="flex:1">${esc(S.config.clipsDir)}</div><button class="btn" id="pickdir">📁 ${t("Změnit", "Change")}</button><button class="btn" data-run="open_clips">${t("Otevřít", "Open")}</button></div>
+    <h2>${chip("settings")}${t("Aplikace", "App")}</h2>
+    <label class="check"><input type="checkbox" id="autostart" ${S.config.autostart ? "checked" : ""} /><span>${t("Spouštět po zapnutí počítače (schovaná u hodin)", "Start when the computer starts (hidden in the tray)")}</span></label>
+    <div class="field" style="margin-top:10px;max-width:260px"><label class="f">${t("Jazyk", "Language")}</label><select id="langsel"><option value="cs" ${S.config.lang === "cs" ? "selected" : ""}>Čeština</option><option value="en" ${S.config.lang === "en" ? "selected" : ""}>English</option></select></div>
   </div>
   <div class="card">
-    <h2>${t("Aplikace", "App")}</h2>
-    <label class="check"><input type="checkbox" id="autostart" ${S.config.autostart ? "checked" : ""} /><span>${t("Spouštět po zapnutí počítače (schovaná u hodin)", "Start when the computer starts (hidden in the tray)")}</span></label>
-    <div class="field" style="margin-top:8px;max-width:240px"><label class="f">${t("Jazyk", "Language")}</label><select id="langsel"><option value="cs" ${S.config.lang === "cs" ? "selected" : ""}>Čeština</option><option value="en" ${S.config.lang === "en" ? "selected" : ""}>English</option></select></div>
-    <div class="row" style="margin-top:6px">
-      <span>${t("Verze", "Version")} <b>${esc(S.version)}</b></span>
+    <div class="row sp"><h2 style="margin:0">${chip("download", "cyan")}${t("Aktualizace", "Updates")} <span class="tag">v${esc(S.version)}</span></h2>
       ${
         S.update.status === "ready"
-          ? `<button class="btn primary" id="installupdate">⬆️ ${t("Nainstalovat verzi", "Install version")} ${esc(S.update.version)}</button>`
-          : `<button class="btn" id="checkupdate" ${S.update.status === "checking" || S.update.status === "downloading" ? "disabled" : ""}>🔄 ${t("Zkontrolovat aktualizace", "Check for updates")}</button>`
+          ? `<button class="btn primary" id="installupdate">${ic("download")} ${t("Nainstalovat verzi", "Install version")} ${esc(S.update.version)}</button>`
+          : `<button class="btn" id="checkupdate" ${S.update.status === "checking" || S.update.status === "downloading" ? "disabled" : ""}>${ic("refresh")} ${t("Zkontrolovat aktualizace", "Check for updates")}</button>`
       }
     </div>
-    <p class="${S.update.status === "error" ? "error" : "muted small"}" style="margin-top:8px">${
+    <p class="${S.update.status === "error" ? "error" : "muted small"}" style="margin-top:10px">${
       {
         idle: t("Aplikace se aktualizuje i sama, při spuštění a pak každých 6 hodin.", "The app also updates itself, on launch and then every 6 hours."),
         checking: t("Hledám novou verzi…", "Looking for a new version…"),
@@ -521,14 +601,14 @@ function tabSettings() {
     }</p>
   </div>
   <div class="card">
-    <h2>${t("Kanál", "Channel")}</h2>
-    <div class="row sp"><span><b>${esc(S.config.channel.name)}</b> <span class="tag gold">Premium</span></span>
-    <span class="row"><button class="btn" data-open="/dashboard/${esc(S.config.channel.id)}/assistant">${t("Otevřít web", "Open the website")}</button><button class="btn danger" id="unpair">${t("Odpojit aplikaci", "Disconnect the app")}</button></span></div>
+    <h2>${chip("crown", "gold")}${t("Kanál", "Channel")}</h2>
+    <div class="row sp"><span><b>${esc(S.config.channel.name)}</b> <span class="tag gold">${ic("crown")} Premium</span></span>
+    <span class="row"><button class="btn" data-open="/dashboard/${esc(S.config.channel.id)}/assistant">${ic("external")} ${t("Otevřít web", "Open the website")}</button><button class="btn danger" id="unpair">${ic("power")} ${t("Odpojit aplikaci", "Disconnect the app")}</button></span></div>
   </div>
   <div class="card">
-    <h2>${t("Odinstalovat", "Uninstall")}</h2>
+    <h2>${chip("trash", "red")}${t("Odinstalovat", "Uninstall")}</h2>
     <p class="soft">${t("Odstraní aplikaci z počítače i s jejím nastavením a odpojí tenhle počítač od kanálu. Tvoje klipy zůstanou ve složce, kde jsou.", "Removes the app and its settings from this computer and disconnects it from the channel. Your clips stay in their folder.")}</p>
-    <div style="margin-top:12px"><button class="btn danger" id="uninstall">🗑️ ${t("Odinstalovat Tejbot Assistent", "Uninstall Tejbot Assistent")}</button></div>
+    <div style="margin-top:12px"><button class="btn danger" id="uninstall">${ic("trash")} ${t("Odinstalovat Tejbot Assistent", "Uninstall Tejbot Assistent")}</button></div>
   </div>`;
 }
 
@@ -545,13 +625,18 @@ function render() {
   const prevMain = document.querySelector(".main");
   const keep = prevMain && render.tab === tab ? prevMain.scrollTop : 0;
   render.tab = tab;
+  const [oc] = obsLabel();
+  const cur = TABS().find(([k]) => k === tab);
   $app.innerHTML = `<aside class="side">
-    <div class="logo"><img src="icon.png" alt="" /> Tejbot Assistent</div>
-    <nav class="nav">${TABS()
-      .map(([k, i, n]) => `<button data-tab="${k}" class="${k === tab ? "on" : ""}"><span>${i}</span>${n}</button>`)
+    <div class="logo drag"><img src="icon.png" alt="" /><span>Tejbot Assistent<small>Premium</small></span></div>
+    <nav class="nav">${NAV()
+      .map(([g, items]) => `${g ? `<div class="grp">${esc(g)}</div>` : ""}${items.map(([k, i, n]) => `<button data-tab="${k}" class="${k === tab ? "on" : ""}">${ic(i)}<span>${n}</span>${k === "obs" && !S.obs.connected ? `<span class="badge dot warn" title="${t("OBS není připojené", "OBS isn't connected")}"></span>` : ""}</button>`).join("")}`)
       .join("")}</nav>
-    <div class="foot"><div class="chan">${ch.avatar ? `<img src="${esc(ch.avatar)}" alt="" />` : ""}<span>${esc(ch.name)}</span></div><p class="muted small" style="margin-top:4px">👑 Premium</p></div>
-  </aside><main class="main">${body}</main>`;
+    <div class="foot">
+      <div class="chan">${ch.avatar ? `<img src="${esc(ch.avatar)}" alt="" />` : `<span class="ava">${esc((ch.name || "?").slice(0, 1).toUpperCase())}</span>`}<span style="min-width:0"><span class="nm" style="display:block">${esc(ch.name)}</span><span class="pr">${ic("crown")} PREMIUM</span></span></div>
+      <div class="minis"><span class="mini" title="OBS"><span class="dot ${oc}"></span>OBS</span><span class="mini" title="${t("Hlasové povely", "Voice commands")}"><span class="dot ${S.voice.status === "listening" ? "ok" : S.config.voice.enabled ? "warn" : ""}"></span>${t("Hlas", "Voice")}</span><span class="mini" title="${t("Hudba", "Music")}"><span class="dot ${S.track ? "ok" : ""}"></span>${t("Hudba", "Music")}</span></div>
+    </div>
+  </aside><div class="mainwrap"><div class="topbar drag"><span class="crumb">Tejbot Assistent <span>›</span> <b>${cur ? cur[2] : ""}</b></span></div><main class="main"><div class="page">${body}</div></main></div>`;
   if (keep) document.querySelector(".main").scrollTop = keep;
   bind();
 }
@@ -567,7 +652,7 @@ const apply = (s) => {
 async function openTab(k) {
   tab = k;
   if (k === "cmds") cmds = S.config.commands.map((c) => ({ ...c }));
-  if (k === "cmds" || k === "obs") lists = await tb.call("obsLists");
+  if (k === "cmds" || k === "obs" || k === "mic") lists = await tb.call("obsLists");
   if (k === "mic") {
     void loadMic();
     void loadPresets();
@@ -598,14 +683,14 @@ function bind() {
   on("[data-show]", "click", (el) => tb.call("showClip", el.dataset.show));
   on("[data-play]", "click", (el) => openPlayer(el.dataset.play));
   on("[data-trash]", "click", async (el) => {
-    if (!confirm(t("Smazat tenhle klip? Přesune se do koše.", "Delete this clip? It moves to the bin."))) return;
+    if (!(await ask(t("Smazat klip?", "Delete the clip?"), t("Klip se přesune do koše, odkud ho jde vrátit.", "The clip moves to the bin, where you can restore it."), t("Smazat", "Delete"), true))) return;
     const r = await tb.call("trashClip", el.dataset.trash);
     if (!r.ok) toast(r);
   });
   on("#refresh", "click", () => tb.call("refresh"));
   on("#lang", "click", async () => apply(await tb.call("saveSettings", { lang: S.config.lang === "en" ? "cs" : "en" })));
   on("#unpair", "click", async () => {
-    if (confirm(t("Odpojit aplikaci od kanálu?", "Disconnect the app from the channel?"))) await tb.call("unpair");
+    if (await ask(t("Odpojit aplikaci?", "Disconnect the app?"), t("Aplikace se odpojí od kanálu. Znovu ji spáruješ kódem z webu.", "The app disconnects from the channel. Pair it again with a code from the website."), t("Odpojit", "Disconnect"), true)) await tb.call("unpair");
   });
 
   // spárování
@@ -673,7 +758,10 @@ function bind() {
     toast({ ok: true, message: pw ? t("Heslo uloženo, připojuji se k OBS…", "Password saved, connecting to OBS…") : t("Uloženo, připojuji se k OBS…", "Saved, connecting to OBS…") });
     tb.call("obsReconnect");
   });
-  on("#mic", "change", async (el) => apply(await tb.call("saveSettings", { obs: { mic: el.value } })));
+  on("#mic", "change", async (el) => {
+    apply(await tb.call("saveSettings", { obs: { mic: el.value } }));
+    if (tab === "mic") void loadMic();
+  });
   on("#autoreplay", "change", async (el) => apply(await tb.call("saveSettings", { obs: { autoReplay: el.checked } })));
 
   // hlas
@@ -695,6 +783,10 @@ function bind() {
     micTimer = setTimeout(() => void tb.call("micApply", mpreset, mv, false), 200);
   };
   on("#micreload", "click", () => void loadMic());
+  on("[data-msub]", "click", (el) => {
+    msub = el.dataset.msub;
+    render();
+  });
   on("[data-micpreset]", "click", (el) => {
     const p = M.presets.find((x) => x.key === el.dataset.micpreset);
     if (!p) return;
@@ -718,6 +810,7 @@ function bind() {
     mv = { ...mv, ...p.values };
     if (p.mine) pform = { name: p.name, category: p.category, microphone: p.microphone, public: p.public };
     else void tb.call("presetUsed", p.id);
+    msub = "preset";
     render();
     micLive();
     toast({ ok: true, message: t(`Načteno: ${p.name}`, `Loaded: ${p.name}`) });
@@ -755,7 +848,7 @@ function bind() {
   });
   on("[data-pdel]", "click", async (el) => {
     const p = P.mine.find((x) => x.id === el.dataset.pdel);
-    if (!p || !confirm(t(`Smazat preset „${p.name}“?`, `Delete the preset “${p.name}”?`))) return;
+    if (!p || !(await ask(t("Smazat preset?", "Delete the preset?"), t(`Preset „${p.name}“ se smaže i z webu.`, `The preset “${p.name}” is deleted from the website too.`), t("Smazat", "Delete"), true))) return;
     toast(await tb.call("presetDelete", p.id));
     if (mpreset === `p:${p.id}`) mpreset = "custom";
     await loadPresets();
@@ -779,7 +872,7 @@ function bind() {
   on("#checkupdate", "click", () => tb.call("checkUpdate"));
   on("#installupdate", "click", () => tb.call("installUpdate"));
   on("#uninstall", "click", async () => {
-    if (!confirm(t("Opravdu odinstalovat Tejbot Assistent? Aplikace se zavře a smaže se i její nastavení. Klipy zůstanou.", "Really uninstall Tejbot Assistent? The app will close and its settings will be deleted. Clips stay."))) return;
+    if (!(await ask(t("Odinstalovat Tejbot Assistent?", "Uninstall Tejbot Assistent?"), t("Aplikace se zavře a smaže se i její nastavení. Klipy zůstanou.", "The app will close and its settings will be deleted. Clips stay."), t("Odinstalovat", "Uninstall"), true))) return;
     const r = await tb.call("uninstall");
     if (!r.ok) toast(r);
   });
@@ -798,7 +891,7 @@ tb.on("state", async (s) => {
   const before = S;
   S = s;
   // OBS se právě připojilo -> načíst seznam mikrofonů a scén
-  if (before && !before.obs.connected && s.obs.connected && (tab === "obs" || tab === "cmds")) lists = await tb.call("obsLists");
+  if (before && !before.obs.connected && s.obs.connected && (tab === "obs" || tab === "cmds" || tab === "mic")) lists = await tb.call("obsLists");
   // ať se rozepsané pole nepřekreslí pod rukama
   const typing = document.activeElement && ["INPUT", "SELECT"].includes(document.activeElement.tagName);
   const screenChanged = !before || before.web !== s.web || before.config.setupDone !== s.config.setupDone;

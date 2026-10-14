@@ -5,7 +5,8 @@ Aplikace do počítače k [TejBotu](https://tejbot.eu). Propojí TejBota s OBS a
 - klipy z OBS (Replay Buffer) do složky, kterou si uživatel vybere
 - ovládání OBS klávesovou zkratkou (mikrofon, scény, nahrávání)
 - widget „Co poslouchám“ (Spotify, Apple Music, YouTube, SoundCloud)
-- hlasové povely: připravují se
+- hlasové povely (rozpoznávání běží jen v počítači)
+- presety zvuku mikrofonu jako filtry v OBS (i komunitní)
 
 Aplikace je jen pomocník: potřebuje kanál s Premium a Premium se v ní koupit nedá (jen na webu).
 
