@@ -7,8 +7,17 @@ const { randomUUID } = require("crypto");
 
 const file = () => path.join(app.getPath("userData"), "config.json");
 
-const DEFAULTS = () => ({
-  lang: "cs",
+const { fromLocale, tr } = require("./i18n");
+// první spuštění: jazyk podle systému
+const sysLang = () => {
+  try {
+    return fromLocale(app.getLocale());
+  } catch {
+    return "en";
+  }
+};
+const DEFAULTS = (lang = sysLang()) => ({
+  lang,
   token: "",
   channel: null,
   clipsDir: path.join(app.getPath("videos"), "Tejbot klipy"),
@@ -19,9 +28,10 @@ const DEFAULTS = () => ({
   mic: { preset: "broadcast", values: null, disableOthers: true, disabled: [], prevMonitor: "" },
   music: { enabled: true, sources: { spotify: true, apple: true, browser: true, other: false } },
   commands: [
-    { id: randomUUID(), name: "Udělej klip", phrase: "udělej klip", hotkey: "", action: "clip", param: "" },
-    { id: randomUUID(), name: "Vypni mikrofon", phrase: "vypni mikrofon", hotkey: "", action: "mic_mute", param: "" },
-    { id: randomUUID(), name: "Zapni mikrofon", phrase: "mikrofon nahlas", hotkey: "", action: "mic_unmute", param: "" },
+    // hlasové povely umí čeština a angličtina (ostatní jazyky mají anglické povely)
+    { id: randomUUID(), name: tr(lang, "Udělej klip", "Make a clip"), phrase: lang === "cs" ? "udělej klip" : "make a clip", hotkey: "", action: "clip", param: "" },
+    { id: randomUUID(), name: tr(lang, "Vypni mikrofon", "Mute microphone"), phrase: lang === "cs" ? "vypni mikrofon" : "mute microphone", hotkey: "", action: "mic_mute", param: "" },
+    { id: randomUUID(), name: tr(lang, "Zapni mikrofon", "Unmute microphone"), phrase: lang === "cs" ? "mikrofon nahlas" : "unmute microphone", hotkey: "", action: "mic_unmute", param: "" },
   ],
 });
 

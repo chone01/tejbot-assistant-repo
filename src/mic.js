@@ -4,7 +4,8 @@
 const config = require("./config");
 const obs = require("./obs");
 
-const L = (cs, en) => (config.get().lang === "en" ? en : cs);
+const { tr } = require("./i18n");
+const L = (cs, en) => tr(config.get().lang, cs, en);
 const clamp = (v, min, max, def) => {
   const n = Number(v);
   return Number.isFinite(n) ? Math.min(max, Math.max(min, n)) : def;

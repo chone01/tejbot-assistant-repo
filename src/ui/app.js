@@ -9,7 +9,27 @@ let cmds = []; // rozpracované příkazy
 let lists = { inputs: [], scenes: [] };
 let pairError = "";
 
-const t = (cs, en) => (S && S.config.lang === "en" ? en : cs);
+// překlady: čeština a angličtina přímo, slovenština / němčina / polština ze slovníku od hlavní části (S.i18n)
+let DICT = null, DICT_FOR = null;
+const escRe = (s) => s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+const t = (cs, en) => {
+  const lang = S ? S.config.lang : "cs";
+  if (lang === "cs") return cs;
+  if (lang === "en" || !S.i18n) return en;
+  if (DICT_FOR !== S.i18n) {
+    DICT_FOR = S.i18n;
+    DICT = { s: S.i18n.s || {}, p: (S.i18n.p || []).map(([f, to]) => ({ re: new RegExp(`^${escRe(f).replace(/\\\{(\d+)\\\}/g, "([\\s\\S]*?)")}$`), to })) };
+  }
+  if (DICT.s[en]) return DICT.s[en];
+  for (const { re, to } of DICT.p) {
+    const m = re.exec(en);
+    if (m) return to.replace(/\{(\d+)\}/g, (_, i) => m[Number(i) + 1] ?? "");
+  }
+  return en;
+};
+const LOCALE = { cs: "cs-CZ", en: "en-GB", sk: "sk-SK", de: "de-DE", pl: "pl-PL" };
+const LANG_LIST = [["cs", "Čeština"], ["en", "English"], ["sk", "Slovenčina"], ["de", "Deutsch"], ["pl", "Polski"]];
+const loc = () => LOCALE[S.config.lang] || "en-GB";
 const esc = (v) => String(v ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c]);
 
 // ikony (styl Lucide, kreslené čarou) – místo emoji, ať okno působí čistě a stejně na každém počítači
@@ -107,7 +127,7 @@ function screenPair() {
         <li>${t("Kód opiš sem.", "Type the code here.")}</li>
       </ol>
     </div>
-    <p class="muted small" style="margin-top:14px">${t("Aplikace nikdy nechce heslo k tvému účtu. Premium se kupuje jen na webu.", "The app never asks for your account password. Premium is bought on the website only.")} · <a id="lang">${S.config.lang === "en" ? "Česky" : "English"}</a></p>
+    <p class="muted small" style="margin-top:14px">${t("Aplikace nikdy nechce heslo k tvému účtu. Premium se kupuje jen na webu.", "The app never asks for your account password. Premium is bought on the website only.")} · <select id="langmini" style="width:auto;padding:2px 8px;font-size:11px;display:inline-block">${LANG_LIST.map(([l, n]) => `<option value="${l}" ${S.config.lang === l ? "selected" : ""}>${n}</option>`).join("")}</select></p>
   </div></div>`;
 }
 
@@ -167,7 +187,7 @@ function obsLabel() {
   return ["warn", t("Nepřipojeno", "Not connected")];
 }
 
-const when = (ms) => new Date(ms).toLocaleString(S.config.lang === "en" ? "en-GB" : "cs-CZ", { day: "numeric", month: "numeric", hour: "2-digit", minute: "2-digit" });
+const when = (ms) => new Date(ms).toLocaleString(loc(), { day: "numeric", month: "numeric", hour: "2-digit", minute: "2-digit" });
 
 // přehrávač přes celé okno (je mimo #app, ať ho nezruší překreslení)
 const $player = document.getElementById("player");
@@ -192,7 +212,7 @@ function hotkeyOf(action) {
 function tabHome() {
   const [oc, ol] = obsLabel();
   const tr = S.track;
-  const until = S.premium.lifetime ? t("napořád", "lifetime") : S.premium.until ? new Date(S.premium.until).toLocaleDateString(S.config.lang === "en" ? "en-GB" : "cs-CZ") : "";
+  const until = S.premium.lifetime ? t("napořád", "lifetime") : S.premium.until ? new Date(S.premium.until).toLocaleDateString(loc()) : "";
   const act = (run, icon, label, sub, main = false) => `<button class="act ${main ? "main" : ""}" data-run="${run}">${chip(icon, main ? "" : "cyan")}<span>${label}<br /><span class="muted">${sub}</span></span></button>`;
   return `<div class="head"><h1>${t("Ahoj", "Hi")}, ${esc(S.config.channel.name)} 👋</h1><p class="muted">${t("Aplikace běží u hodin i po zavření okna, aby fungovaly klávesové zkratky a hlasové povely.", "The app keeps running in the tray after you close the window so hotkeys and voice commands work.")}</p></div>
   <div class="grid">
@@ -579,7 +599,7 @@ function tabSettings() {
   <div class="card">
     <h2>${chip("settings")}${t("Aplikace", "App")}</h2>
     <label class="check"><input type="checkbox" id="autostart" ${S.config.autostart ? "checked" : ""} /><span>${t("Spouštět po zapnutí počítače (schovaná u hodin)", "Start when the computer starts (hidden in the tray)")}</span></label>
-    <div class="field" style="margin-top:10px;max-width:260px"><label class="f">${t("Jazyk", "Language")}</label><select id="langsel"><option value="cs" ${S.config.lang === "cs" ? "selected" : ""}>Čeština</option><option value="en" ${S.config.lang === "en" ? "selected" : ""}>English</option></select></div>
+    <div class="field" style="margin-top:10px;max-width:260px"><label class="f">${t("Jazyk", "Language")}</label><select id="langsel">${LANG_LIST.map(([l, n]) => `<option value="${l}" ${S.config.lang === l ? "selected" : ""}>${n}</option>`).join("")}</select></div>
   </div>
   <div class="card">
     <div class="row sp"><h2 style="margin:0">${chip("download", "cyan")}${t("Aktualizace", "Updates")} <span class="tag">v${esc(S.version)}</span></h2>
@@ -688,7 +708,7 @@ function bind() {
     if (!r.ok) toast(r);
   });
   on("#refresh", "click", () => tb.call("refresh"));
-  on("#lang", "click", async () => apply(await tb.call("saveSettings", { lang: S.config.lang === "en" ? "cs" : "en" })));
+  on("#langmini", "change", async (el) => apply(await tb.call("saveSettings", { lang: el.value })));
   on("#unpair", "click", async () => {
     if (await ask(t("Odpojit aplikaci?", "Disconnect the app?"), t("Aplikace se odpojí od kanálu. Znovu ji spáruješ kódem z webu.", "The app disconnects from the channel. Pair it again with a code from the website."), t("Odpojit", "Disconnect"), true)) await tb.call("unpair");
   });

@@ -21,7 +21,8 @@ let webState = "unknown"; // ok | offline | unpaired | nopremium
 let lastClips = [];
 let hotkeyErrors = [];
 
-const L = (cs, en) => (config.get().lang === "en" ? en : cs);
+const { tr } = require("./i18n");
+const L = (cs, en) => tr(config.get().lang, cs, en);
 const send = (name, data) => win && !win.isDestroyed() && win.webContents.send(`tb:${name}`, data);
 const enabled = () => webState === "ok";
 
@@ -162,6 +163,8 @@ function fullState() {
     web: webState,
     premium,
     config: { ...cfg, token: undefined, obs: { ...cfg.obs, password: cfg.obs.password ? "••••••" : "" } },
+    // překlady pro okno (jen pro slovenštinu, němčinu a polštinu)
+    i18n: ["sk", "de", "pl"].includes(cfg.lang) ? require("./i18n").dict(cfg.lang) : null,
     hasObsPassword: !!cfg.obs.password,
     obs: obs.state(),
     track: media.current(),
@@ -427,7 +430,7 @@ handle("finishSetup", () => {
 });
 handle("saveSettings", (patch) => {
   const cfg = config.get();
-  if (patch.lang === "cs" || patch.lang === "en") cfg.lang = patch.lang;
+  if (["cs", "en", "sk", "de", "pl"].includes(patch.lang)) cfg.lang = patch.lang;
   if (typeof patch.autostart === "boolean") {
     cfg.autostart = patch.autostart;
     if (app.isPackaged) app.setLoginItemSettings({ openAtLogin: cfg.autostart, args: ["--hidden"] });

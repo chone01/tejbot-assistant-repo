@@ -32,7 +32,8 @@ const ACTIONS = [
   { key: "web:countdown_minus", cs: "Odpočet: ubrat minutu", en: "Countdown: remove a minute" },
 ];
 
-const L = (cs, en) => (config.get().lang === "en" ? en : cs);
+const { tr } = require("./i18n");
+const L = (cs, en) => tr(config.get().lang, cs, en);
 function notify(title, body) {
   try {
     if (Notification.isSupported()) new Notification({ title, body, silent: true }).show();
