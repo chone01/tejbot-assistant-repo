@@ -7,7 +7,7 @@ const api = require("./api");
 const { tr } = require("./i18n");
 
 const L = (cs, en) => tr(config.get().lang, cs, en);
-const POLL_MS = 6000;
+const POLL_MS = 3000; // panel v OBS čeká na start streamu, ať to netrvá dlouho
 const WAIT_OBS_MS = 15 * 60_000; // když OBS není připojené, odkaz počká
 
 let running = false;
@@ -60,6 +60,22 @@ async function addSource(p) {
 async function handle(cmd) {
   if (handled.has(cmd.id)) return;
   const p = cmd.payload || {};
+  // panel „Začít vysílat“ v OBS (tajný odkaz streamera) – bez ptaní
+  if (cmd.kind === "go_live" || cmd.kind === "stop_stream") {
+    handled.add(cmd.id);
+    if (!obs.state().connected) return report(cmd.id, "error", L("Tejbot Assistent není připojený k OBS.", "Tejbot Assistent isn't connected to OBS."));
+    try {
+      const st = await obs.call("GetStreamStatus");
+      if (cmd.kind === "go_live") {
+        if (!st.outputActive) await obs.call("StartStream");
+        if (p.record) await obs.call("StartRecord").catch(() => {});
+        onDone({ ok: true, message: L("Vysíláš! Ať se stream daří.", "You're live! Have a great stream.") });
+      } else if (st.outputActive) await obs.call("StopStream");
+      return report(cmd.id, "done", "");
+    } catch (e) {
+      return report(cmd.id, "error", `${L("OBS stream nespustilo", "OBS didn't start the stream")}: ${String((e && e.message) || e).slice(0, 200)}`);
+    }
+  }
   const mode = config.get().remote.mode;
   if (cmd.kind !== "add_source" || !/^https?:\/\//i.test(String(p.url || ""))) {
     handled.add(cmd.id);
