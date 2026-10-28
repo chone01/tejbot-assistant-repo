@@ -14,7 +14,15 @@ let stopped = true;
 let run = 0; // číslo pokusu: starší pokus už nesmí nic přepsat
 
 const state = () => ({ connected, connecting: busy && !connected, error: lastError, detail });
-const emit = () => events.emit("state", state());
+let lastEmit = "";
+// stav hlásíme jen při změně (při opakovaném připojování k vypnutému OBS se jinak okno překreslovalo každých pár vteřin)
+const emit = () => {
+  const st = state();
+  const key = JSON.stringify(st);
+  if (key === lastEmit) return;
+  lastEmit = key;
+  events.emit("state", st);
+};
 
 const withTimeout = (p, ms) => Promise.race([p, new Promise((_, no) => setTimeout(() => no(new Error("OBS neodpovídá (vypršel čas)")), ms))]);
 
@@ -31,7 +39,8 @@ async function connect() {
   const my = ++run;
   clearTimeout(timer);
   busy = true;
-  emit();
+  // první pokus ukáže „Připojuji…“; další pokusy na pozadí (OBS je vypnuté) stav nemění
+  if (!lastError) emit();
   const { url, password, autoReplay } = config.get().obs;
   let err = null;
   for (const u of candidates(url)) {
@@ -116,6 +125,8 @@ module.exports = {
   },
   reconnect: () => {
     stopped = false;
+    lastError = ""; // ruční „Připojit znovu“ ukáže „Připojuji…“
+    detail = "";
     return connect();
   },
   /** seznam zvukových vstupů a scén pro výběr v nastavení */

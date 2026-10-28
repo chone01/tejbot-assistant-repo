@@ -122,7 +122,8 @@ async function monitor(on) {
   const cfg = config.get();
   if (on) {
     const cur = await obs.call("GetInputAudioMonitorType", { inputName: source });
-    if (cur.monitorType === "OBS_MONITORING_TYPE_NONE") cfg.mic.prevMonitor = cur.monitorType;
+    // zapamatovat původní poslech (ať ho vypnutí vrátí přesně, jak byl), ale ne náš vlastní
+    if (cur.monitorType !== "OBS_MONITORING_TYPE_MONITOR_AND_OUTPUT" || !cfg.mic.prevMonitor) cfg.mic.prevMonitor = cur.monitorType === "OBS_MONITORING_TYPE_MONITOR_AND_OUTPUT" ? "OBS_MONITORING_TYPE_NONE" : cur.monitorType;
     await obs.call("SetInputAudioMonitorType", { inputName: source, monitorType: "OBS_MONITORING_TYPE_MONITOR_AND_OUTPUT" });
   } else {
     await obs.call("SetInputAudioMonitorType", { inputName: source, monitorType: cfg.mic.prevMonitor || "OBS_MONITORING_TYPE_NONE" });

@@ -10,14 +10,15 @@ let lists = { inputs: [], scenes: [] };
 let pairError = "";
 
 // překlady: čeština a angličtina přímo, slovenština / němčina / polština ze slovníku od hlavní části (S.i18n)
-let DICT = null, DICT_FOR = null;
+let DICT = null, DICT_FOR = "";
 const escRe = (s) => s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 const t = (cs, en) => {
   const lang = S ? S.config.lang : "cs";
   if (lang === "cs") return cs;
   if (lang === "en" || !S.i18n) return en;
-  if (DICT_FOR !== S.i18n) {
-    DICT_FOR = S.i18n;
+  // slovník se převede jen jednou pro jazyk (ne při každé změně stavu – to zpomalovalo okno)
+  if (DICT_FOR !== lang) {
+    DICT_FOR = lang;
     DICT = { s: S.i18n.s || {}, p: (S.i18n.p || []).map(([f, to]) => ({ re: new RegExp(`^${escRe(f).replace(/\\\{(\d+)\\\}/g, "([\\s\\S]*?)")}$`), to })) };
   }
   if (DICT.s[en]) return DICT.s[en];
@@ -635,10 +636,10 @@ function tabSettings() {
 function render() {
   if (!S) return;
   document.documentElement.lang = S.config.lang;
-  if (S.web === "unpaired") return ($app.innerHTML = screenPair()), bind();
-  if (S.web === "nopremium") return ($app.innerHTML = screenNoPremium()), bind();
-  if (S.web === "offline" || S.web === "unknown") return ($app.innerHTML = screenOffline()), bind();
-  if (!S.config.setupDone) return ($app.innerHTML = screenSetup()), bind();
+  if (S.web === "unpaired") return paint(screenPair()), bind();
+  if (S.web === "nopremium") return paint(screenNoPremium()), bind();
+  if (S.web === "offline" || S.web === "unknown") return paint(screenOffline()), bind();
+  if (!S.config.setupDone) return paint(screenSetup()), bind();
   const body = { home: tabHome, cmds: tabCmds, obs: tabObs, mic: tabMic, voice: tabVoice, music: tabMusic, settings: tabSettings }[tab]();
   const ch = S.config.channel;
   // překreslení nesmí okno posunout nahoru (třeba po uložení)
@@ -647,7 +648,7 @@ function render() {
   render.tab = tab;
   const [oc] = obsLabel();
   const cur = TABS().find(([k]) => k === tab);
-  $app.innerHTML = `<aside class="side">
+  paint(`<aside class="side">
     <div class="logo drag"><img src="icon.png" alt="" /><span>Tejbot Assistent<small>Premium</small></span></div>
     <nav class="nav">${NAV()
       .map(([g, items]) => `${g ? `<div class="grp">${esc(g)}</div>` : ""}${items.map(([k, i, n]) => `<button data-tab="${k}" class="${k === tab ? "on" : ""}">${ic(i)}<span>${n}</span>${k === "obs" && !S.obs.connected ? `<span class="badge dot warn" title="${t("OBS není připojené", "OBS isn't connected")}"></span>` : ""}</button>`).join("")}`)
@@ -656,14 +657,70 @@ function render() {
       <div class="chan">${ch.avatar ? `<img src="${esc(ch.avatar)}" alt="" />` : `<span class="ava">${esc((ch.name || "?").slice(0, 1).toUpperCase())}</span>`}<span style="min-width:0"><span class="nm" style="display:block">${esc(ch.name)}</span><span class="pr">${ic("crown")} PREMIUM</span></span></div>
       <div class="minis"><span class="mini" title="OBS"><span class="dot ${oc}"></span>OBS</span><span class="mini" title="${t("Hlasové povely", "Voice commands")}"><span class="dot ${S.voice.status === "listening" ? "ok" : S.config.voice.enabled ? "warn" : ""}"></span>${t("Hlas", "Voice")}</span><span class="mini" title="${t("Hudba", "Music")}"><span class="dot ${S.track ? "ok" : ""}"></span>${t("Hudba", "Music")}</span></div>
     </div>
-  </aside><div class="mainwrap"><div class="topbar drag"><span class="crumb">Tejbot Assistent <span>›</span> <b>${cur ? cur[2] : ""}</b></span></div><main class="main"><div class="page">${body}</div></main></div>`;
-  if (keep) document.querySelector(".main").scrollTop = keep;
+  </aside><div class="mainwrap"><div class="topbar drag"><span class="crumb">Tejbot Assistent <span>›</span> <b>${cur ? cur[2] : ""}</b></span></div><main class="main"><div class="page" id="pg-${tab}">${body}</div></main></div>`);
+  if (keep && document.querySelector(".main").scrollTop !== keep) document.querySelector(".main").scrollTop = keep;
   bind();
+}
+
+// ---------------------------------------------------------------- překreslení bez blikání
+// Okno se nepřepisuje celé (to restartovalo animaci stránky a náhledy klipů = problikávání),
+// ale porovná se se starým a změní se jen to, co je jinak.
+const sig = (n) => (n.nodeType !== 1 ? `#${n.nodeType}` : `${n.tagName}#${n.id}|${n.getAttribute("type") || ""}|${[...n.attributes].map((a) => a.name).filter((x) => x.startsWith("data-")).sort().join(",")}`);
+function syncAttrs(a, b) {
+  for (const at of [...a.attributes]) if (!b.hasAttribute(at.name)) a.removeAttribute(at.name);
+  for (const at of [...b.attributes]) if (a.getAttribute(at.name) !== at.value) a.setAttribute(at.name, at.value);
+}
+function morph(from, to) {
+  const a = [...from.childNodes];
+  const b = [...to.childNodes];
+  for (let i = 0; i < b.length; i++) {
+    const nb = b[i];
+    const na = a[i];
+    if (!na) {
+      from.appendChild(nb);
+      continue;
+    }
+    if (sig(na) !== sig(nb)) {
+      from.replaceChild(nb, na);
+      continue;
+    }
+    if (na.nodeType !== 1) {
+      if (na.nodeValue !== nb.nodeValue) na.nodeValue = nb.nodeValue;
+      continue;
+    }
+    // stejné video (náhled klipu) nechat být, jinak by se znovu načítalo
+    if (na.tagName === "VIDEO" && na.getAttribute("src") === nb.getAttribute("src")) continue;
+    const focused = na === document.activeElement;
+    const selVal = na.tagName === "SELECT" ? ((nb.querySelector("option[selected]") || nb.querySelector("option") || {}).value ?? "") : null;
+    syncAttrs(na, nb);
+    if (na.tagName === "INPUT" && !focused) {
+      if (na.type === "checkbox" || na.type === "radio") na.checked = nb.hasAttribute("checked");
+      else if (na.value !== (nb.getAttribute("value") || "")) na.value = nb.getAttribute("value") || "";
+    }
+    morph(na, nb);
+    if (selVal !== null && !focused && na.value !== selVal) na.value = selVal;
+  }
+  for (let i = a.length - 1; i >= b.length; i--) if (a[i].parentNode === from) from.removeChild(a[i]);
+}
+function paint(html) {
+  const tpl = document.createElement("div");
+  tpl.innerHTML = html;
+  morph($app, tpl);
 }
 
 // ---------------------------------------------------------------- klikání
 
-const on = (sel, ev, fn) => document.querySelectorAll(sel).forEach((el) => el.addEventListener(ev, (e) => fn(el, e)));
+// posluchač se přidá jen jednou (prvky, které překreslení nechá, ho už mají)
+const BOUND = new WeakMap();
+const on = (sel, ev, fn) =>
+  document.querySelectorAll(sel).forEach((el) => {
+    const key = `${ev} ${sel}`;
+    let set = BOUND.get(el);
+    if (!set) BOUND.set(el, (set = new Set()));
+    if (set.has(key)) return;
+    set.add(key);
+    el.addEventListener(ev, (e) => fn(el, e));
+  });
 const apply = (s) => {
   S = s;
   render();

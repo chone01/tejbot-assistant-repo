@@ -24,6 +24,20 @@ let hotkeyErrors = [];
 const { tr } = require("./i18n");
 const L = (cs, en) => tr(config.get().lang, cs, en);
 const send = (name, data) => win && !win.isDestroyed() && win.webContents.send(`tb:${name}`, data);
+// stav do okna posíláme nejvýš jednou za 120 ms a jen když se opravdu změnil (jinak okno zbytečně překresluje)
+let stateTimer = null;
+let lastStateJson = "";
+function pushState() {
+  if (stateTimer) return;
+  stateTimer = setTimeout(() => {
+    stateTimer = null;
+    const st = fullState();
+    const json = JSON.stringify(st);
+    if (json === lastStateJson) return;
+    lastStateJson = json;
+    send("state", st);
+  }, 120);
+}
 const enabled = () => webState === "ok";
 
 if (!app.requestSingleInstanceLock()) app.quit();
@@ -138,7 +152,7 @@ async function refreshMe() {
     }
   }
   if (before !== webState) applyState();
-  send("state", fullState());
+  pushState();
 }
 
 function applyState() {
@@ -189,7 +203,7 @@ async function sendTrack(changed) {
   }
 }
 media.events.on("track", () => {
-  send("state", fullState());
+  pushState();
   void sendTrack(true);
 });
 // jednou za minutu dá webu vědět, že aplikace pořád běží (jinak widget skladbu schová)
@@ -197,7 +211,7 @@ setInterval(() => media.current() && Date.now() - lastSent > 55000 && void sendT
 
 let wasConnected = false;
 obs.events.on("state", (st) => {
-  send("state", fullState());
+  pushState();
   if (st.connected && !wasConnected) send("toast", { ok: true, message: L("OBS připojeno.", "OBS connected.") });
   wasConnected = st.connected;
 });
@@ -230,7 +244,7 @@ function scanClips() {
   }
   const changed = JSON.stringify(list) !== JSON.stringify(lastClips);
   lastClips = list;
-  if (changed) send("state", fullState());
+  if (changed) pushState();
   watchClips();
 }
 function watchClips() {
@@ -303,7 +317,7 @@ function voiceLang() {
 }
 const setVoice = (patch) => {
   voice = { ...voice, ...patch };
-  send("state", fullState());
+  pushState();
 };
 function stopVoice() {
   if (voiceWin && !voiceWin.isDestroyed()) voiceWin.destroy();
@@ -372,6 +386,21 @@ fromVoice("voiceHeard", ({ text, hit, conf, wake, reason }) => {
   if (c) void runAction(c.action, c.param).then((r) => (!win || !win.isVisible()) && r.ok && r.message && actions.notify("Tejbot Assistent", r.message));
 });
 
+// ------------------------------------------------------------ spouštění po startu počítače
+// Windows: přes systém. Linux (AppImage): soubor v ~/.config/autostart (Electron to na Linuxu sám neumí).
+function setAutostart(on) {
+  if (process.platform !== "linux") return app.setLoginItemSettings({ openAtLogin: on, args: ["--hidden"] });
+  const file = path.join(os.homedir(), ".config", "autostart", "tejbot-assistent.desktop");
+  try {
+    if (!on) return fs.rmSync(file, { force: true });
+    const exe = process.env.APPIMAGE || process.execPath;
+    fs.mkdirSync(path.dirname(file), { recursive: true });
+    fs.writeFileSync(file, ["[Desktop Entry]", "Type=Application", "Name=Tejbot Assistent", `Exec="${exe}" --hidden`, "X-GNOME-Autostart-enabled=true", ""].join("\n"));
+  } catch {
+    /* složku nejde zapsat */
+  }
+}
+
 // ------------------------------------------------------------ příkazy z okna
 const handle = (name, fn) => ipcMain.handle(`tb:${name}`, (_e, ...args) => fn(...args));
 
@@ -433,7 +462,7 @@ handle("saveSettings", (patch) => {
   if (["cs", "en", "sk", "de", "pl"].includes(patch.lang)) cfg.lang = patch.lang;
   if (typeof patch.autostart === "boolean") {
     cfg.autostart = patch.autostart;
-    if (app.isPackaged) app.setLoginItemSettings({ openAtLogin: cfg.autostart, args: ["--hidden"] });
+    if (app.isPackaged) setAutostart(cfg.autostart);
   }
   if (patch.music) {
     cfg.music = { enabled: patch.music.enabled !== false, sources: { ...cfg.music.sources, ...(patch.music.sources || {}) } };
@@ -586,7 +615,7 @@ let updater = null;
 let update = { status: "idle", version: "", percent: 0, error: "" }; // idle | checking | none | downloading | ready | error
 const setUpdate = (patch) => {
   update = { ...update, ...patch };
-  send("state", fullState());
+  pushState();
 };
 function setupUpdater() {
   if (!app.isPackaged) return;
