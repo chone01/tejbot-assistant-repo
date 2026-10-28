@@ -66,6 +66,8 @@ const ICONS = {
   link: '<path d="M10 13a5 5 0 0 0 7.5.5l3-3a5 5 0 0 0-7-7l-1.8 1.7M14 11a5 5 0 0 0-7.5-.5l-3 3a5 5 0 0 0 7 7l1.7-1.7"/>',
   zap: '<path d="M13 2 3 14h9l-1 8 10-12h-9z"/>',
   bulb: '<path d="M9 18h6M10 22h4M12 2a7 7 0 0 0-4 12.7V17h8v-2.3A7 7 0 0 0 12 2z"/>',
+  radio: '<path d="M4.9 19.1a10 10 0 0 1 0-14.2M7.8 16.2a6 6 0 0 1 0-8.4M16.2 7.8a6 6 0 0 1 0 8.4M19.1 4.9a10 10 0 0 1 0 14.2"/><circle cx="12" cy="12" r="2"/>',
+  monitorup: '<path d="m9 10 3-3 3 3M12 13V7"/><rect x="2" y="3" width="20" height="14" rx="2"/><path d="M12 17v4M8 21h8"/>',
   film: '<rect x="3" y="3" width="18" height="18" rx="2.5"/><path d="M7 3v18M17 3v18M3 7.5h4M3 12h18M3 16.5h4M17 7.5h4M17 16.5h4"/>',
 };
 const ic = (n, cls = "") => `<svg class="i ${cls}" viewBox="0 0 24 24" aria-hidden="true">${ICONS[n] || ""}</svg>`;
@@ -218,12 +220,16 @@ function tabHome() {
   return `<div class="head"><h1>${t("Ahoj", "Hi")}, ${esc(S.config.channel.name)} 👋</h1><p class="muted">${t("Aplikace běží u hodin i po zavření okna, aby fungovaly klávesové zkratky a hlasové povely.", "The app keeps running in the tray after you close the window so hotkeys and voice commands work.")}</p></div>
   <div class="grid">
     <div class="stat premium"><div class="k">${ic("crown")} TejBot</div><div class="v"><span class="dot ok"></span><span class="t">Premium${until ? ` · ${esc(until)}` : ""}</span></div></div>
-    <div class="stat"><div class="k">${ic("obs")} OBS</div><div class="v"><span class="dot ${oc}"></span><span class="t">${ol}</span></div></div>
+    <div class="stat"><div class="k">${ic("obs")} OBS</div><div class="v"><span class="dot ${oc}"></span><span class="t">${ol}${S.obs.streaming ? ` · <b class="livetxt">${t("ŽIVĚ", "LIVE")}</b>` : ""}</span></div></div>
     <div class="stat"><div class="k">${ic("music")} ${t("Právě hraje", "Now playing")}</div><div class="v"><span class="dot ${tr ? "ok" : ""}"></span><span class="t">${tr ? esc(`${tr.artist ? `${tr.artist} – ` : ""}${tr.title}`) : S.config.music.enabled ? t("Nic", "Nothing") : t("Vypnuto", "Off")}</span></div></div>
   </div>
   ${!S.obs.connected ? `<div class="card warnc"><div class="row sp"><div><h2 style="margin-bottom:4px">${chip("alert", "gold")}${t("OBS zatím není připojené", "OBS isn't connected yet")}</h2><p class="soft">${t("Spusť OBS a zapni v něm WebSocket server. Bez něj nejdou klipy ani ovládání OBS.", "Start OBS and enable its WebSocket server. Clips and OBS control need it.")}</p></div><button class="btn" data-tab="obs">${t("Jak na to", "How to")} ›</button></div></div>` : ""}
   <div class="card">
     <h2>${chip("zap")}${t("Rychlé akce", "Quick actions")}</h2>
+    <div class="golive ${S.obs.streaming ? "on" : ""}">
+      <div><b>${S.obs.streaming ? t("Právě vysíláš", "You're live") : t("Připraven na stream?", "Ready to stream?")}</b><span class="muted small">${S.obs.streaming ? t("Stream běží v OBS.", "The stream is running in OBS.") : t("Nejdřív si nastavíš název a kategorii, stream začne až potom.", "Set the title and category first, the stream starts after that.")}</span></div>
+      ${S.obs.streaming ? `<button class="btn danger" id="stopstream">${ic("power")} ${t("Ukončit vysílání", "End stream")}</button>` : `<button class="btn live" id="golive" ${S.obs.connected ? "" : "disabled"}>${ic("radio")} ${t("Začít vysílat", "Go live")} ${hotkeyOf("golive")}</button>`}
+    </div>
     <div class="actions">
       ${act("clip", "scissors", t("Uložit klip", "Save a clip"), hotkeyOf("clip") || t("posledních pár vteřin", "the last few seconds"), true)}
       ${act("mic_toggle", "micoff", t("Ztlumit mikrofon", "Mute microphone"), hotkeyOf("mic_toggle") || t("zapnout / vypnout", "on / off"))}
@@ -308,6 +314,17 @@ function tabObs() {
     <label class="check" style="margin-top:8px"><input type="checkbox" id="autoreplay" ${o.autoReplay ? "checked" : ""} /><span>${t("Zapínat záznam do paměti automaticky, když se aplikace připojí k OBS", "Start the Replay Buffer automatically when the app connects to OBS")}</span></label>
     <label class="f" style="margin-top:12px">${t("Klipy se ukládají do", "Clips are saved to")}</label>
     <div class="row"><div class="path" style="flex:1">${esc(S.config.clipsDir)}</div><button class="btn" id="pickdir">${ic("folder")} ${t("Změnit", "Change")}</button><button class="btn ghost" data-run="open_clips">${t("Otevřít", "Open")}</button></div>
+  </div>
+  <div class="card">
+    <h2>${chip("monitorup")}${t("Odkazy od pomocníků", "Links from editors")}</h2>
+    <p class="soft">${t("Pomocníci kanálu (i ty sám) můžou na webu TejBota u odkazu do OBS kliknout na „Do OBS“ a aplikace ho přidá do OBS jako zdroj Prohlížeč.", "Channel editors (and you) can click “To OBS” next to an OBS link on the TejBot website and the app adds it to OBS as a Browser source.")}</p>
+    ${[
+      ["ask", t("Vždycky se zeptat", "Always ask"), t("Okno se zeptá, než se cokoli přidá.", "A window asks before anything is added.")],
+      ["tejbot", t("Odkazy z TejBota přidat hned", "Add TejBot links right away"), t("Odkazy z tejbot.eu se přidají samy, na ostatní se aplikace zeptá.", "Links from tejbot.eu are added automatically, the app asks about others.")],
+      ["off", t("Nepřijímat", "Don't accept"), t("Odkazy z webu se do OBS nedostanou.", "Links from the website never reach OBS.")],
+    ]
+      .map(([v, n, d]) => `<label class="check radio"><input type="radio" name="remote" value="${v}" data-remote ${S.config.remote && S.config.remote.mode === v ? "checked" : ""} /><span>${n}<br /><span class="muted small">${d}</span></span></label>`)
+      .join("")}
   </div>`;
 }
 
@@ -945,6 +962,14 @@ function bind() {
   on("#musicon", "change", saveMusic);
   on("[data-src]", "change", saveMusic);
 
+  // vysílání
+  on("#golive", "click", () => openGoLive());
+  on("#stopstream", "click", async () => {
+    if (!(await ask(t("Ukončit vysílání?", "End the stream?"), t("Stream v OBS se zastaví.", "The stream in OBS will stop."), t("Ukončit", "End"), true))) return;
+    toast(await tb.call("run", "stream_stop", ""));
+  });
+  on("[data-remote]", "change", async (el) => apply(await tb.call("saveSettings", { remote: { mode: el.value } })));
+
   // nastavení
   on("#checkupdate", "click", () => tb.call("checkUpdate"));
   on("#installupdate", "click", () => tb.call("installUpdate"));
@@ -956,6 +981,129 @@ function bind() {
   on("#autostart", "change", async (el) => apply(await tb.call("saveSettings", { autostart: el.checked })));
   on("#langsel", "change", async (el) => apply(await tb.call("saveSettings", { lang: el.value })));
 }
+
+// ---------------------------------------------------------------- okno „Začít vysílat“
+// Jako ve Streamlabs: kliknutí stream hned nespustí, nejdřív se nastaví název a kategorie.
+let goliveOpen = false;
+async function openGoLive() {
+  if (goliveOpen || !S || S.web !== "ok") return;
+  goliveOpen = true;
+  const m = document.createElement("div");
+  m.className = "modal";
+  const rec = S.config.golive || { record: false, recent: [] };
+  let cat = null;
+  let orig = { title: "", cat: "" };
+  let timer = null;
+  const catHtml = (c) => `${c.thumbnail ? `<img src="${esc(c.thumbnail)}" alt="" />` : `<span class="noimg">${ic("film")}</span>`}<span>${esc(c.name)}</span>`;
+  m.innerHTML = `<div class="mbox wide" role="dialog" aria-modal="true">
+    <h2>${chip("radio", "red")}${t("Začít vysílat", "Go live")}</h2>
+    <p id="gl-load" class="muted small">${t("Načítám název a kategorii streamu…", "Loading the stream title and category…")}</p>
+    <label class="f" for="gl-title">${t("Název streamu", "Stream title")} <span class="muted small" id="gl-cnt"></span></label>
+    <input type="text" id="gl-title" maxlength="140" />
+    <label class="f" for="gl-q" style="margin-top:12px">${t("Kategorie", "Category")}</label>
+    <div id="gl-cat" class="catsel"></div>
+    <input type="text" id="gl-q" placeholder="${t("Hledat kategorii (třeba Just Chatting, Minecraft…)", "Search a category (e.g. Just Chatting, Minecraft…)")}" />
+    <div id="gl-res" class="catlist"></div>
+    ${rec.recent && rec.recent.length ? `<div class="recent"><span class="muted small">${t("Naposledy:", "Recent:")}</span>${rec.recent.map((c, i) => `<button class="btn sm" data-recent="${i}">${esc(c.name)}</button>`).join("")}</div>` : ""}
+    <label class="check" style="margin-top:8px"><input type="checkbox" id="gl-rec" ${rec.record ? "checked" : ""} /><span>${t("Spustit i nahrávání (záznam pro Trim editor)", "Start recording too (a recording for the Trim editor)")}</span></label>
+    ${S.obs.connected ? "" : `<div class="note">${ic("alert")}<span>${t("OBS není připojené, stream teď nejde spustit.", "OBS isn't connected, the stream can't start now.")}</span></div>`}
+    <div class="row" style="margin-top:16px;justify-content:flex-end"><button class="btn ghost" data-a="0">${t("Zrušit", "Cancel")}</button><button class="btn live" id="gl-go" ${S.obs.connected ? "" : "disabled"}>${ic("radio")} ${t("Začít vysílat", "Go live")}</button></div>
+  </div>`;
+  const $ = (sel) => m.querySelector(sel);
+  const close = () => {
+    m.remove();
+    goliveOpen = false;
+    document.removeEventListener("keydown", key);
+  };
+  const key = (e) => e.key === "Escape" && close();
+  const setCat = (c) => {
+    cat = c;
+    $("#gl-cat").innerHTML = c ? `<span class="catitem on">${catHtml(c)}</span>` : `<span class="muted small">${t("Bez kategorie", "No category")}</span>`;
+    $("#gl-res").innerHTML = "";
+    $("#gl-q").value = "";
+  };
+  const count = () => ($("#gl-cnt").textContent = `${$("#gl-title").value.length}/140`);
+  m.addEventListener("click", (e) => {
+    if (e.target === m || e.target.closest('[data-a="0"]')) return close();
+    const r = e.target.closest("[data-res]");
+    if (r) setCat(JSON.parse(r.dataset.res));
+    const rc = e.target.closest("[data-recent]");
+    if (rc) setCat(rec.recent[Number(rc.dataset.recent)]);
+  });
+  document.addEventListener("keydown", key);
+  document.body.appendChild(m);
+  setCat(null);
+  $("#gl-title").addEventListener("input", count);
+  $("#gl-q").addEventListener("input", () => {
+    clearTimeout(timer);
+    const q = $("#gl-q").value.trim();
+    if (q.length < 2) return ($("#gl-res").innerHTML = "");
+    timer = setTimeout(async () => {
+      const list = await tb.call("streamSearch", q);
+      if ($("#gl-q").value.trim() !== q) return;
+      $("#gl-res").innerHTML = list.length ? list.map((c) => `<button class="catitem" data-res="${esc(JSON.stringify(c))}">${catHtml(c)}</button>`).join("") : `<p class="muted small">${t("Nic jsem nenašel.", "Nothing found.")}</p>`;
+    }, 350);
+  });
+  $("#gl-go").addEventListener("click", async () => {
+    const b = $("#gl-go");
+    b.disabled = true;
+    b.innerHTML = `${ic("refresh")} ${t("Spouštím…", "Starting…")}`;
+    const title = $("#gl-title").value.trim();
+    const changed = title !== orig.title || (cat ? String(cat.id) : "") !== orig.cat;
+    const r = await tb.call("goLive", { title, category: cat, record: $("#gl-rec").checked, changed });
+    toast(r);
+    if (r.ok) close();
+    else {
+      b.disabled = false;
+      b.innerHTML = `${ic("radio")} ${t("Začít vysílat", "Go live")}`;
+    }
+  });
+  $("#gl-title").focus();
+  const info = await tb.call("streamInfo");
+  if (!m.isConnected) return;
+  if (info && info.ok) {
+    $("#gl-load").hidden = true;
+    if (!$("#gl-title").value) $("#gl-title").value = info.title || "";
+    orig = { title: info.title || "", cat: info.category && info.category.id ? String(info.category.id) : "" };
+    if (!cat && info.category && info.category.name) setCat(info.category);
+  } else $("#gl-load").textContent = t("Aktuální název se nepodařilo načíst (bot je offline?). Můžeš ho napsat znovu, nebo jen spustit stream.", "Couldn't load the current title (is the bot offline?). You can type it again or just start the stream.");
+  count();
+}
+tb.on("golive", () => openGoLive());
+
+// ---------------------------------------------------------------- odkaz od pomocníka -> zeptat se
+const asking = new Set();
+function showAsk(d) {
+  if (!d || asking.has(d.id)) return;
+  asking.add(d.id);
+  const p = d.payload || {};
+  const m = document.createElement("div");
+  m.className = "modal";
+  m.dataset.ask = d.id;
+  m.innerHTML = `<div class="mbox wide" role="dialog" aria-modal="true"><h2>${chip("monitorup")}${t("Přidat do OBS?", "Add to OBS?")}</h2>
+    <p><b>${esc(d.by || t("Pomocník", "An editor"))}</b> ${t("ti posílá zdroj do OBS:", "is sending you an OBS source:")}</p>
+    <div class="askinfo"><div><span class="muted small">${t("Název", "Name")}</span><b>${esc(p.name)}</b></div><div><span class="muted small">${t("Scéna", "Scene")}</span><b>${esc(p.scene || t("aktuální", "current"))}</b></div><div><span class="muted small">${t("Velikost", "Size")}</span><b>${esc(p.width)} × ${esc(p.height)}</b></div></div>
+    <div class="path" style="margin-top:10px">${esc(p.url)}</div>
+    ${/^https:\/\/([a-z0-9-]+\.)*tejbot\.eu\//i.test(String(p.url)) ? "" : `<div class="note">${ic("alert")}<span>${t("Tohle není odkaz z TejBota. Přidej ho, jen když víš, co to je.", "This isn't a TejBot link. Only add it if you know what it is.")}</span></div>`}
+    <div class="row" style="margin-top:16px;justify-content:flex-end"><button class="btn ghost" data-a="0">${t("Nepřidávat", "Don't add")}</button><button class="btn primary" data-a="1">${ic("plus")} ${t("Přidat do OBS", "Add to OBS")}</button></div></div>`;
+  const done = (yes) => {
+    m.remove();
+    asking.delete(d.id);
+    void tb.call("remoteAnswer", d.id, yes);
+  };
+  m.addEventListener("click", (e) => {
+    const b = e.target.closest("[data-a]");
+    if (b) done(b.dataset.a === "1");
+  });
+  document.body.appendChild(m);
+}
+tb.on("remoteAsk", showAsk);
+tb.on("remoteAskClose", (id) => {
+  const m = document.querySelector(`[data-ask="${CSS.escape(String(id))}"]`);
+  if (m) m.remove();
+  asking.delete(id);
+});
+tb.call("pendingAsks").then((list) => (list || []).forEach(showAsk));
 
 // ---------------------------------------------------------------- start
 

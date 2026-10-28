@@ -41,4 +41,11 @@ module.exports = {
   presetUpdate: (id, p) => call("PATCH", `/api/assistant/presets/${encodeURIComponent(id)}`, p),
   presetDelete: (id) => call("DELETE", `/api/assistant/presets/${encodeURIComponent(id)}`),
   presetUsed: (id) => call("POST", `/api/assistant/presets/${encodeURIComponent(id)}`),
+  // pomocníci z webu posílají odkazy do OBS
+  commands: () => call("GET", "/api/assistant/commands"),
+  commandDone: (id, status, message) => call("POST", `/api/assistant/commands/${encodeURIComponent(id)}`, { status, message }),
+  // aplikace hlásí webu scény v OBS
+  obsState: (st) => call("POST", "/api/assistant/obs", st),
+  // okno „Začít vysílat“: název a kategorie streamu
+  stream: (body) => call("POST", "/api/assistant/stream", body),
 };

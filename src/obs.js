@@ -13,7 +13,8 @@ let timer = null;
 let stopped = true;
 let run = 0; // číslo pokusu: starší pokus už nesmí nic přepsat
 
-const state = () => ({ connected, connecting: busy && !connected, error: lastError, detail });
+let streaming = false; // OBS právě vysílá
+const state = () => ({ connected, connecting: busy && !connected, error: lastError, detail, streaming });
 let lastEmit = "";
 // stav hlásíme jen při změně (při opakovaném připojování k vypnutému OBS se jinak okno překreslovalo každých pár vteřin)
 const emit = () => {
@@ -70,7 +71,13 @@ async function connect() {
   connected = true;
   lastError = "";
   detail = "";
+  try {
+    streaming = !!(await obs.call("GetStreamStatus")).outputActive;
+  } catch {
+    streaming = false;
+  }
   emit();
+  events.emit("scenes");
   if (autoReplay) {
     try {
       const r = await obs.call("GetReplayBufferStatus");
@@ -88,12 +95,23 @@ obs.on("ConnectionClosed", () => {
   if (busy) return; // zavření během připojování řeší connect()
   if (connected) {
     connected = false;
+    streaming = false;
     lastError = "offline";
     emit();
+    events.emit("scenes");
   }
   schedule();
 });
 obs.on("ReplayBufferSaved", (d) => events.emit("replay", d.savedReplayPath));
+obs.on("StreamStateChanged", (d) => {
+  // STARTING / STOPPING se ignoruje, stav se mění až po skutečném startu nebo konci
+  if (d.outputState === "OBS_WEBSOCKET_OUTPUT_STARTED" || d.outputState === "OBS_WEBSOCKET_OUTPUT_STOPPED") {
+    streaming = !!d.outputActive;
+    emit();
+  }
+});
+// scény se změnily -> aplikace to řekne webu (pomocník pak vybírá, kam přidat zdroj)
+for (const ev of ["SceneListChanged", "CurrentProgramSceneChanged", "SceneNameChanged", "SceneCreated", "SceneRemoved"]) obs.on(ev, () => events.emit("scenes"));
 
 async function call(name, data) {
   if (!connected) throw Object.assign(new Error("OBS není připojené"), { code: "NO_OBS" });
@@ -128,6 +146,11 @@ module.exports = {
     lastError = ""; // ruční „Připojit znovu“ ukáže „Připojuji…“
     detail = "";
     return connect();
+  },
+  /** scény pro web (bez zjišťování zvuku, rychlé) */
+  scenes: async () => {
+    const r = await call("GetSceneList");
+    return { scenes: r.scenes.map((x) => x.sceneName).reverse(), current: r.currentProgramSceneName || "" };
   },
   /** seznam zvukových vstupů a scén pro výběr v nastavení */
   lists: async () => {

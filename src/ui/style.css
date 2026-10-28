@@ -245,3 +245,25 @@ input[type="range"]::-webkit-slider-thumb { appearance: none; width: 16px; heigh
 .toast[hidden] { display: none; }
 /* pruh nahoře, za který jde okno chytit a posunout (systémová tlačítka jsou vpravo) */
 .dragbar { position: fixed; top: 0; left: 0; right: 0; height: 40px; z-index: 5; -webkit-app-region: drag; }
+
+/* vysílání */
+.golive { display: flex; align-items: center; justify-content: space-between; gap: 14px; padding: 14px 16px; margin-bottom: 14px; border-radius: 16px; border: 1px solid rgba(251, 113, 133, 0.28); background: linear-gradient(120deg, rgba(251, 113, 133, 0.14), rgba(251, 113, 133, 0.03)); }
+.golive > div { display: flex; flex-direction: column; gap: 3px; }
+.golive.on { border-color: rgba(251, 113, 133, 0.55); box-shadow: 0 0 0 3px rgba(251, 113, 133, 0.08); }
+.btn.live { background: linear-gradient(180deg, #fb7185, #e11d48); border-color: transparent; color: #fff; box-shadow: 0 8px 24px -10px rgba(225, 29, 72, 0.8), inset 0 1px 0 rgba(255, 255, 255, 0.35); }
+.btn.live:hover { filter: brightness(1.07); }
+.btn.live .kbd { color: rgba(255, 255, 255, 0.8); }
+.livetxt { color: #fb7185; letter-spacing: 0.06em; }
+.modal .mbox.wide { width: min(560px, 100%); max-height: calc(100vh - 60px); overflow-y: auto; }
+.catsel { margin-bottom: 8px; min-height: 22px; }
+.catlist { display: grid; grid-template-columns: repeat(2, 1fr); gap: 6px; margin-top: 8px; max-height: 210px; overflow-y: auto; }
+.catitem { display: flex; align-items: center; gap: 10px; padding: 6px 8px; border-radius: 11px; border: 1px solid var(--line); background: rgba(255, 255, 255, 0.03); color: var(--ink); font: 600 12.5px/1.25 "Inter", sans-serif; cursor: pointer; text-align: left; min-width: 0; }
+.catitem span:last-child { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.catitem:hover { border-color: rgba(163, 230, 53, 0.4); background: rgba(163, 230, 53, 0.05); }
+.catitem.on { display: inline-flex; border-color: var(--brand); background: rgba(163, 230, 53, 0.08); cursor: default; }
+.catitem img, .catitem .noimg { width: 28px; height: 38px; border-radius: 5px; object-fit: cover; flex-shrink: 0; background: rgba(255, 255, 255, 0.06); display: inline-flex; align-items: center; justify-content: center; }
+.recent { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; margin-top: 10px; }
+.askinfo { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
+.askinfo > div { display: flex; flex-direction: column; gap: 2px; padding: 8px 10px; border-radius: 11px; border: 1px solid var(--line); background: rgba(255, 255, 255, 0.03); min-width: 0; }
+.askinfo b { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.check.radio input[type="radio"] { width: 16px; height: 16px; margin-top: 2px; accent-color: var(--brand); flex-shrink: 0; }

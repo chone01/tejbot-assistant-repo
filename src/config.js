@@ -27,6 +27,10 @@ const DEFAULTS = (lang = sysLang()) => ({
   voice: { enabled: false, lang: "", deviceId: "", wake: true, wakeWord: "tejbot", gain: 1, strict: 75 },
   mic: { preset: "broadcast", values: null, disableOthers: true, disabled: [], prevMonitor: "" },
   music: { enabled: true, sources: { spotify: true, apple: true, browser: true, other: false } },
+  // odkazy od pomocníků z webu: ask = vždy se zeptat, tejbot = odkazy z TejBota přidat hned, off = nepřijímat
+  remote: { mode: "ask" },
+  // okno „Začít vysílat“: spustit i nahrávání, naposledy použité kategorie
+  golive: { record: false, recent: [] },
   commands: [
     // hlasové povely umí čeština a angličtina (ostatní jazyky mají anglické povely)
     { id: randomUUID(), name: tr(lang, "Udělej klip", "Make a clip"), phrase: lang === "cs" ? "udělej klip" : "make a clip", hotkey: "", action: "clip", param: "" },
@@ -69,7 +73,7 @@ function load() {
   } catch {
     /* první spuštění */
   }
-  cfg = { ...d, ...saved, voice: { ...d.voice, ...(saved.voice || {}) }, mic: { ...d.mic, ...(saved.mic || {}) }, obs: { ...d.obs, ...(saved.obs || {}) }, music: { ...d.music, ...(saved.music || {}), sources: { ...d.music.sources, ...((saved.music || {}).sources || {}) } } };
+  cfg = { ...d, ...saved, voice: { ...d.voice, ...(saved.voice || {}) }, mic: { ...d.mic, ...(saved.mic || {}) }, obs: { ...d.obs, ...(saved.obs || {}) }, remote: { ...d.remote, ...(saved.remote || {}) }, golive: { ...d.golive, ...(saved.golive || {}) }, music: { ...d.music, ...(saved.music || {}), sources: { ...d.music.sources, ...((saved.music || {}).sources || {}) } } };
   if (!Array.isArray(cfg.commands)) cfg.commands = d.commands;
   for (const p of SECRET) setIn(cfg, p, dec(getIn(cfg, p)));
   return cfg;

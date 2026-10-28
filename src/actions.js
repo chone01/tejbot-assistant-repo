@@ -15,6 +15,8 @@ const ACTIONS = [
   { key: "record_toggle", cs: "Nahrávání: spustit / zastavit", en: "Recording: start / stop" },
   { key: "replay_toggle", cs: "Záznam do paměti: zapnout / vypnout", en: "Replay Buffer: on / off" },
   { key: "open_clips", cs: "Otevřít složku s klipy", en: "Open the clips folder" },
+  { key: "golive", cs: "Začít vysílat (okno s názvem a kategorií)", en: "Go live (window with title and category)" },
+  { key: "stream_stop", cs: "Ukončit vysílání", en: "End the stream" },
   // akce na webu TejBota (nepotřebují OBS připojené k aplikaci, jen přihlášenou aplikaci)
   { key: "web:alert_skip", cs: "Alerty: přeskočit právě běžící", en: "Alerts: skip the current one" },
   { key: "web:alert_pause", cs: "Alerty: pozastavit", en: "Alerts: pause" },
@@ -136,6 +138,13 @@ async function run(action, param) {
       case "replay_toggle": {
         const r = await obs.call("ToggleReplayBuffer");
         message = r.outputActive ? L("Záznam do paměti zapnutý", "Replay Buffer on") : L("Záznam do paměti vypnutý", "Replay Buffer off");
+        break;
+      }
+      case "stream_stop": {
+        const st = await obs.call("GetStreamStatus");
+        if (!st.outputActive) throw new Error(L("Stream teď neběží.", "The stream isn't running."));
+        await obs.call("StopStream");
+        message = L("Vysílání ukončeno", "Stream ended");
         break;
       }
       case "open_clips":

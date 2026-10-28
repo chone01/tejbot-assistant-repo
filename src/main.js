@@ -12,6 +12,7 @@ const obs = require("./obs");
 const mic = require("./mic");
 const media = require("./media");
 const actions = require("./actions");
+const remote = require("./remote");
 
 let win = null;
 let tray = null;
@@ -106,6 +107,12 @@ async function runAction(action, param) {
     send("toast", r);
     return r;
   }
+  // okno „Začít vysílat“ (název a kategorie) – otevře se v aplikaci
+  if (action === "golive") {
+    showWindow();
+    send("golive", true);
+    return { ok: true, message: "" };
+  }
   const r = await actions.run(action, param);
   if (r.message) send("toast", r);
   if (!r.ok && (!win || !win.isVisible())) actions.notify("Tejbot Assistent", r.message);
@@ -161,9 +168,11 @@ function applyState() {
   if (enabled()) {
     obs.start();
     media.start();
+    remote.start();
   } else {
     obs.stop();
     media.stop();
+    remote.stop();
   }
   restartVoice();
 }
@@ -218,6 +227,36 @@ obs.events.on("state", (st) => {
 actions.setOnClip((c) => {
   scanClips();
   send("toast", { ok: true, message: `${L("Klip uložen", "Clip saved")}: ${path.basename(c.file)}` });
+});
+
+// ------------------------------------------------------------ odkazy od pomocníků z webu
+// Okno se ukáže bez převzetí klávesnice (streamer může být zrovna ve hře) a zeptá se.
+const asks = new Map();
+const askData = new Map(); // pro okno, které se teprve otevírá
+remote.setAsker(
+  (cmd) =>
+    new Promise((resolve) => {
+      asks.set(cmd.id, resolve);
+      if (!win || win.isDestroyed()) createWindow();
+      else if (!win.isVisible()) win.showInactive();
+      win.flashFrame(true);
+      const data = { id: cmd.id, by: cmd.by_name || "", payload: cmd.payload || {} };
+      askData.set(cmd.id, data);
+      send("remoteAsk", data);
+      actions.notify("Tejbot Assistent", L(`${cmd.by_name || "Pomocník"} chce přidat do OBS: ${(cmd.payload || {}).name || ""}`, `${cmd.by_name || "An editor"} wants to add to OBS: ${(cmd.payload || {}).name || ""}`));
+      // bez odpovědi do 2 minut = nepřidat
+      setTimeout(() => {
+        if (!asks.has(cmd.id)) return;
+        asks.delete(cmd.id);
+        askData.delete(cmd.id);
+        send("remoteAskClose", cmd.id);
+        resolve(false);
+      }, 120000);
+    })
+);
+remote.setOnDone((r) => {
+  send("toast", r);
+  if (!win || !win.isVisible()) actions.notify("Tejbot Assistent", r.message);
 });
 
 // ------------------------------------------------------------ klipy ve složce
@@ -482,6 +521,7 @@ handle("saveSettings", (patch) => {
     config.save();
     restartVoice();
   }
+  if (patch.remote && ["ask", "tejbot", "off"].includes(patch.remote.mode)) cfg.remote.mode = patch.remote.mode;
   if (patch.obs) {
     const o = patch.obs;
     const reconnect = (typeof o.url === "string" && o.url !== cfg.obs.url) || typeof o.password === "string";
@@ -507,6 +547,59 @@ handle("saveCommands", (list) => {
   return fullState();
 });
 handle("run", (action, param) => runAction(action, param));
+handle("pendingAsks", () => [...askData.values()]);
+handle("remoteAnswer", (id, yes) => {
+  const r = asks.get(id);
+  if (!r) return;
+  asks.delete(id);
+  askData.delete(id);
+  if (win && !win.isDestroyed()) win.flashFrame(false);
+  r(!!yes);
+});
+// okno „Začít vysílat“
+handle("streamInfo", async () => {
+  try {
+    const r = await api.stream({ action: "get" });
+    return r.ok && r.data ? r.data : { ok: false };
+  } catch {
+    return { ok: false };
+  }
+});
+handle("streamSearch", async (q) => {
+  try {
+    const r = await api.stream({ action: "search", q: String(q || "").slice(0, 60) });
+    return (r.ok && r.data && r.data.list) || [];
+  } catch {
+    return [];
+  }
+});
+handle("goLive", async (o) => {
+  const opt = o && typeof o === "object" ? o : {};
+  if (!obs.state().connected) return { ok: false, message: L("OBS není připojené. Je spuštěné a má zapnutý WebSocket server?", "OBS isn't connected. Is it running with the WebSocket server enabled?") };
+  const cfg = config.get();
+  const title = String(opt.title || "").trim().slice(0, 140);
+  const cat = opt.category && opt.category.id ? { id: String(opt.category.id).slice(0, 40), name: String(opt.category.name || "").slice(0, 80), thumbnail: typeof opt.category.thumbnail === "string" ? opt.category.thumbnail.slice(0, 400) : null } : null;
+  let warn = "";
+  if (opt.changed && (title || cat)) {
+    try {
+      const r = await api.stream({ action: "set", title, category_id: cat ? cat.id : "" });
+      if (!r.ok || !r.data || !r.data.ok) warn = L("Název a kategorii se nepodařilo změnit, stream běží s původními. Změníš je na webu nebo příkazem !title a !game.", "Couldn't change the title and category, the stream runs with the old ones. Change them on the website or with !title and !game.");
+    } catch {
+      warn = L("Web TejBota neodpověděl, název a kategorie zůstaly původní.", "The TejBot site didn't respond, the title and category stayed the same.");
+    }
+  }
+  cfg.golive.record = !!opt.record;
+  if (cat) cfg.golive.recent = [cat, ...(cfg.golive.recent || []).filter((c) => c && c.id !== cat.id)].slice(0, 6);
+  config.save();
+  try {
+    const st = await obs.call("GetStreamStatus");
+    if (!st.outputActive) await obs.call("StartStream");
+  } catch (e) {
+    return { ok: false, message: `${L("OBS stream nespustilo", "OBS didn't start the stream")}: ${String((e && e.message) || e).slice(0, 200)}` };
+  }
+  if (opt.record) await obs.call("StartRecord").catch(() => {});
+  return { ok: true, warn: !!warn, message: warn || L("Vysíláš! Ať se stream daří.", "You're live! Have a great stream.") };
+});
 handle("obsLists", async () => {
   try {
     return await obs.lists();
@@ -675,5 +768,6 @@ app.on("before-quit", () => {
   quitting = true;
   stopVoice();
   media.stop();
+  remote.stop();
 });
 app.on("will-quit", () => globalShortcut.unregisterAll());
