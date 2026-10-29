@@ -267,3 +267,13 @@ input[type="range"]::-webkit-slider-thumb { appearance: none; width: 16px; heigh
 .askinfo > div { display: flex; flex-direction: column; gap: 2px; padding: 8px 10px; border-radius: 11px; border: 1px solid var(--line); background: rgba(255, 255, 255, 0.03); min-width: 0; }
 .askinfo b { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .check.radio input[type="radio"] { width: 16px; height: 16px; margin-top: 2px; accent-color: var(--brand); flex-shrink: 0; }
+
+/* zdarma vs. Premium */
+.chan .pr.free { color: var(--soft); }
+.nav .navlock { margin-left: auto; display: inline-flex; color: var(--gold); opacity: 0.85; }
+.nav .navlock .i { width: 13px; height: 13px; }
+.act.locked { opacity: 0.7; }
+.act.locked .muted { color: var(--gold); }
+.act.locked .muted .i { width: 11px; height: 11px; vertical-align: -1px; }
+.card.lockc { border-color: rgba(245, 196, 81, 0.35); background: radial-gradient(520px 170px at 0% 0%, rgba(245, 196, 81, 0.1), transparent 70%), linear-gradient(180deg, rgba(255, 255, 255, 0.04), rgba(255, 255, 255, 0.015)); }
+.head h1 .tag { vertical-align: middle; font-size: 11px; }

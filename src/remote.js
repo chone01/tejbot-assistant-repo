@@ -67,7 +67,10 @@ async function handle(cmd) {
     try {
       const st = await obs.call("GetStreamStatus");
       if (cmd.kind === "go_live") {
-        if (!st.outputActive) await obs.call("StartStream");
+        if (!st.outputActive) {
+          obs.markSelfStart();
+          await obs.call("StartStream");
+        }
         if (p.record) await obs.call("StartRecord").catch(() => {});
         onDone({ ok: true, message: L("Vysíláš! Ať se stream daří.", "You're live! Have a great stream.") });
       } else if (st.outputActive) await obs.call("StopStream");

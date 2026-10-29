@@ -29,8 +29,9 @@ const DEFAULTS = (lang = sysLang()) => ({
   music: { enabled: true, sources: { spotify: true, apple: true, browser: true, other: false } },
   // odkazy od pomocníků z webu: ask = vždy se zeptat, tejbot = odkazy z TejBota přidat hned, off = nepřijímat
   remote: { mode: "ask" },
-  // okno „Začít vysílat“: spustit i nahrávání, naposledy použité kategorie
-  golive: { record: false, recent: [] },
+  // okno „Začít vysílat“: spustit i nahrávání, naposledy použité kategorie,
+  // guard = otevřít okno, když se stream pustí tlačítkem přímo v OBS
+  golive: { record: false, recent: [], guard: true },
   commands: [
     // hlasové povely umí čeština a angličtina (ostatní jazyky mají anglické povely)
     { id: randomUUID(), name: tr(lang, "Udělej klip", "Make a clip"), phrase: lang === "cs" ? "udělej klip" : "make a clip", hotkey: "", action: "clip", param: "" },

@@ -7,16 +7,16 @@ const obs = require("./obs");
 const api = require("./api");
 
 const ACTIONS = [
-  { key: "clip", cs: "Uložit klip (posledních pár vteřin)", en: "Save a clip (last few seconds)" },
+  { key: "clip", free: true, cs: "Uložit klip (posledních pár vteřin)", en: "Save a clip (last few seconds)" },
   { key: "mic_toggle", cs: "Mikrofon: přepnout", en: "Microphone: toggle" },
   { key: "mic_mute", cs: "Mikrofon: vypnout", en: "Microphone: mute" },
   { key: "mic_unmute", cs: "Mikrofon: zapnout", en: "Microphone: unmute" },
   { key: "scene", cs: "Přepnout scénu", en: "Switch scene", param: "scene" },
   { key: "record_toggle", cs: "Nahrávání: spustit / zastavit", en: "Recording: start / stop" },
-  { key: "replay_toggle", cs: "Záznam do paměti: zapnout / vypnout", en: "Replay Buffer: on / off" },
-  { key: "open_clips", cs: "Otevřít složku s klipy", en: "Open the clips folder" },
-  { key: "golive", cs: "Začít vysílat (okno s názvem a kategorií)", en: "Go live (window with title and category)" },
-  { key: "stream_stop", cs: "Ukončit vysílání", en: "End the stream" },
+  { key: "replay_toggle", free: true, cs: "Záznam do paměti: zapnout / vypnout", en: "Replay Buffer: on / off" },
+  { key: "open_clips", free: true, cs: "Otevřít složku s klipy", en: "Open the clips folder" },
+  { key: "golive", free: true, cs: "Začít vysílat (okno s názvem a kategorií)", en: "Go live (window with title and category)" },
+  { key: "stream_stop", free: true, cs: "Ukončit vysílání", en: "End the stream" },
   // akce na webu TejBota (nepotřebují OBS připojené k aplikaci, jen přihlášenou aplikaci)
   { key: "web:alert_skip", cs: "Alerty: přeskočit právě běžící", en: "Alerts: skip the current one" },
   { key: "web:alert_pause", cs: "Alerty: pozastavit", en: "Alerts: pause" },
@@ -33,6 +33,9 @@ const ACTIONS = [
   { key: "web:countdown_plus", cs: "Odpočet: přidat minutu", en: "Countdown: add a minute" },
   { key: "web:countdown_minus", cs: "Odpočet: ubrat minutu", en: "Countdown: remove a minute" },
 ];
+
+// zdarma pro všechny (ostatní akce jsou součást Premium)
+const isFree = (key) => ACTIONS.some((a) => a.key === key && a.free);
 
 const { tr } = require("./i18n");
 const L = (cs, en) => tr(config.get().lang, cs, en);
@@ -161,4 +164,4 @@ async function run(action, param) {
   }
 }
 
-module.exports = { ACTIONS, run, notify, setOnClip: (fn) => (onClip = fn) };
+module.exports = { ACTIONS, isFree, run, notify, setOnClip: (fn) => (onClip = fn) };

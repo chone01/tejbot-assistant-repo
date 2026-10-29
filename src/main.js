@@ -18,7 +18,7 @@ let win = null;
 let tray = null;
 let quitting = false;
 let premium = { active: false, until: null, lifetime: false };
-let webState = "unknown"; // ok | offline | unpaired | nopremium
+let webState = "unknown"; // ok | offline | unpaired
 let lastClips = [];
 let hotkeyErrors = [];
 
@@ -40,6 +40,9 @@ function pushState() {
   }, 120);
 }
 const enabled = () => webState === "ok";
+// Aplikace je zdarma (Začít vysílat, klipy). Premium: ostatní akce, hlas, Co poslouchám, presety, odkazy od pomocníků.
+const isPrem = () => enabled() && !!premium.active;
+const PREMIUM_MSG = () => L("Tohle je součást Premium. Pořídit ho jde na webu TejBota.", "This is part of Premium. You can get it on the TejBot website.");
 
 if (!app.requestSingleInstanceLock()) app.quit();
 app.on("second-instance", () => showWindow());
@@ -103,8 +106,14 @@ function buildTray() {
 
 async function runAction(action, param) {
   if (!enabled() && action !== "open_clips") {
-    const r = { ok: false, message: L("Aplikace potřebuje spárovaný kanál s Premium.", "The app needs a paired channel with Premium.") };
+    const r = { ok: false, message: L("Aplikace potřebuje spárovaný kanál a připojení k internetu.", "The app needs a paired channel and an internet connection.") };
     send("toast", r);
+    return r;
+  }
+  if (!isPrem() && !actions.isFree(action)) {
+    const r = { ok: false, message: PREMIUM_MSG() };
+    send("toast", r);
+    if (!win || !win.isVisible()) actions.notify("Tejbot Assistent", r.message);
     return r;
   }
   // okno „Začít vysílat“ (název a kategorie) – otevře se v aplikaci
@@ -124,7 +133,7 @@ function registerHotkeys() {
   hotkeyErrors = [];
   if (!enabled()) return;
   for (const c of config.get().commands) {
-    if (!c.hotkey) continue;
+    if (!c.hotkey || (!isPrem() && !actions.isFree(c.action))) continue; // Premium akce bez Premium nemají zkratku
     let ok = false;
     try {
       ok = globalShortcut.register(c.hotkey, () => runAction(c.action, c.param));
@@ -138,7 +147,7 @@ function registerHotkeys() {
 /** Zeptá se webu, ke kterému kanálu aplikace patří a jestli má Premium */
 async function refreshMe() {
   const cfg = config.get();
-  const before = webState;
+  const before = `${webState}|${!!premium.active}`;
   if (!cfg.token) webState = "unpaired";
   else {
     try {
@@ -152,13 +161,13 @@ async function refreshMe() {
         cfg.channel = r.data.channel;
         config.save();
         premium = r.data.premium;
-        webState = premium.active ? "ok" : "nopremium";
+        webState = "ok";
       } else if (webState === "unknown") webState = "offline";
     } catch {
       if (webState !== "ok") webState = "offline"; // krátký výpadek internetu nic nevypíná
     }
   }
-  if (before !== webState) applyState();
+  if (before !== `${webState}|${!!premium.active}`) applyState();
   pushState();
 }
 
@@ -167,8 +176,12 @@ function applyState() {
   buildTray();
   if (enabled()) {
     obs.start();
-    media.start();
     remote.start();
+    if (isPrem()) media.start();
+    else {
+      media.stop();
+      void api.nowPlaying(null, true).catch(() => {});
+    }
   } else {
     obs.stop();
     media.stop();
@@ -203,7 +216,7 @@ function fullState() {
 // ------------------------------------------------------------ hudba -> web
 let lastSent = 0;
 async function sendTrack(changed) {
-  if (!enabled() || !config.get().music.enabled) return;
+  if (!isPrem() || !config.get().music.enabled) return;
   try {
     await api.nowPlaying(media.current(), changed);
     lastSent = Date.now();
@@ -223,6 +236,13 @@ obs.events.on("state", (st) => {
   pushState();
   if (st.connected && !wasConnected) send("toast", { ok: true, message: L("OBS připojeno.", "OBS connected.") });
   wasConnected = st.connected;
+});
+// pojistka: stream pustil streamer tlačítkem přímo v OBS -> hned otevřít okno s názvem a kategorií
+obs.events.on("streamStarted", ({ self }) => {
+  if (self || !enabled() || config.get().golive.guard === false) return;
+  showWindow();
+  send("golive", { live: true });
+  actions.notify("Tejbot Assistent", L("Stream běží. Zkontroluj název a kategorii v okně aplikace.", "You're live. Check the title and category in the app window."));
 });
 actions.setOnClip((c) => {
   scanClips();
@@ -365,7 +385,7 @@ function stopVoice() {
 function restartVoice() {
   stopVoice();
   const cfg = config.get();
-  if (!enabled() || !cfg.voice.enabled) return setVoice({ status: "off", error: "", unknown: [], allUnknown: [], wakes: [], calib: "" });
+  if (!isPrem() || !cfg.voice.enabled) return setVoice({ status: "off", error: "", unknown: [], allUnknown: [], wakes: [], calib: "" });
   if (!voiceLang()) return setVoice({ status: "error", error: "model: missing", unknown: [], allUnknown: [], wakes: [] });
   setVoice({ status: "loading", error: "", unknown: [], allUnknown: [], wakes: [], calib: "" });
   voiceWin = new BrowserWindow({
@@ -505,7 +525,7 @@ handle("saveSettings", (patch) => {
   }
   if (patch.music) {
     cfg.music = { enabled: patch.music.enabled !== false, sources: { ...cfg.music.sources, ...(patch.music.sources || {}) } };
-    if (enabled()) {
+    if (isPrem()) {
       media.start();
       if (!cfg.music.enabled) void api.nowPlaying(null, true).catch(() => {});
     }
@@ -522,6 +542,7 @@ handle("saveSettings", (patch) => {
     restartVoice();
   }
   if (patch.remote && ["ask", "tejbot", "off"].includes(patch.remote.mode)) cfg.remote.mode = patch.remote.mode;
+  if (patch.golive && typeof patch.golive.guard === "boolean") cfg.golive.guard = patch.golive.guard;
   if (patch.obs) {
     const o = patch.obs;
     const reconnect = (typeof o.url === "string" && o.url !== cfg.obs.url) || typeof o.password === "string";
@@ -591,14 +612,19 @@ handle("goLive", async (o) => {
   cfg.golive.record = !!opt.record;
   if (cat) cfg.golive.recent = [cat, ...(cfg.golive.recent || []).filter((c) => c && c.id !== cat.id)].slice(0, 6);
   config.save();
+  let already = false;
   try {
     const st = await obs.call("GetStreamStatus");
-    if (!st.outputActive) await obs.call("StartStream");
+    already = !!st.outputActive;
+    if (!already) {
+      obs.markSelfStart();
+      await obs.call("StartStream");
+    }
   } catch (e) {
     return { ok: false, message: `${L("OBS stream nespustilo", "OBS didn't start the stream")}: ${String((e && e.message) || e).slice(0, 200)}` };
   }
   if (opt.record) await obs.call("StartRecord").catch(() => {});
-  return { ok: true, warn: !!warn, message: warn || L("Vysíláš! Ať se stream daří.", "You're live! Have a great stream.") };
+  return { ok: true, warn: !!warn, message: warn || (already ? L("Název a kategorie jsou uložené.", "The title and category are saved.") : L("Vysíláš! Ať se stream daří.", "You're live! Have a great stream.")) };
 });
 handle("obsLists", async () => {
   try {
@@ -610,7 +636,7 @@ handle("obsLists", async () => {
 handle("obsReconnect", () => obs.reconnect());
 // presety mikrofonu (filtry v OBS)
 handle("micStatus", () => mic.status());
-handle("micApply", (preset, values, disableOthers) => mic.apply(preset, values, disableOthers));
+handle("micApply", (preset, values, disableOthers) => (isPrem() ? mic.apply(preset, values, disableOthers) : { ok: false, message: PREMIUM_MSG() }));
 handle("micBypass", (on) => mic.bypass(!!on));
 handle("micMonitor", (on) => mic.monitor(!!on));
 handle("micRevert", () => mic.revert());

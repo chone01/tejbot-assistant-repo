@@ -14,6 +14,7 @@ let stopped = true;
 let run = 0; // číslo pokusu: starší pokus už nesmí nic přepsat
 
 let streaming = false; // OBS právě vysílá
+let selfStart = 0; // kdy stream pustila aplikace sama (okno nebo panel „Začít vysílat“)
 const state = () => ({ connected, connecting: busy && !connected, error: lastError, detail, streaming });
 let lastEmit = "";
 // stav hlásíme jen při změně (při opakovaném připojování k vypnutému OBS se jinak okno překreslovalo každých pár vteřin)
@@ -106,8 +107,15 @@ obs.on("ReplayBufferSaved", (d) => events.emit("replay", d.savedReplayPath));
 obs.on("StreamStateChanged", (d) => {
   // STARTING / STOPPING se ignoruje, stav se mění až po skutečném startu nebo konci
   if (d.outputState === "OBS_WEBSOCKET_OUTPUT_STARTED" || d.outputState === "OBS_WEBSOCKET_OUTPUT_STOPPED") {
+    const was = streaming;
     streaming = !!d.outputActive;
     emit();
+    // pojistka: stream pustil někdo tlačítkem v OBS (ne aplikace) -> main.js otevře okno s názvem a kategorií
+    if (streaming && !was) {
+      const self = Date.now() - selfStart < 60000;
+      selfStart = 0;
+      events.emit("streamStarted", { self });
+    }
   }
 });
 // scény se změnily -> aplikace to řekne webu (pomocník pak vybírá, kam přidat zdroj)
@@ -122,6 +130,8 @@ module.exports = {
   events,
   state,
   call,
+  /** aplikace teď sama spouští stream (pojistka pak okno neotevře) */
+  markSelfStart: () => (selfStart = Date.now()),
   start: () => {
     if (!stopped) return;
     stopped = false;
