@@ -604,7 +604,16 @@ handle("goLive", async (o) => {
   if (opt.changed && (title || cat)) {
     try {
       const r = await api.stream({ action: "set", title, category_id: cat ? cat.id : "" });
-      if (!r.ok || !r.data || !r.data.ok) warn = L("Název a kategorii se nepodařilo změnit, stream běží s původními. Změníš je na webu nebo příkazem !title a !game.", "Couldn't change the title and category, the stream runs with the old ones. Change them on the website or with !title and !game.");
+      const d = (r && r.data) || {};
+      if (!r.ok || !d.ok) {
+        const st = Number(d.status) || 0;
+        warn =
+          st === 401 || st === 403
+            ? L("Kick změnu názvu a kategorie odmítl – chybí oprávnění. Propoj kanál na webu znovu (Profil › Propojit znovu).", "Kick refused the title and category change – a permission is missing. Reconnect your channel on the website (Profile › Reconnect).")
+            : d.offline
+              ? L("Bot TejBota teď neodpovídá, název a kategorie zůstaly původní.", "The TejBot bot isn't responding right now, the title and category stayed the same.")
+              : L("Název a kategorii se nepodařilo změnit, stream běží s původními. Změníš je na webu nebo příkazem !title a !game.", "Couldn't change the title and category, the stream runs with the old ones. Change them on the website or with !title and !game.");
+      }
     } catch {
       warn = L("Web TejBota neodpověděl, název a kategorie zůstaly původní.", "The TejBot site didn't respond, the title and category stayed the same.");
     }
