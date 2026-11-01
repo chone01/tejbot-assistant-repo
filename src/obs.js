@@ -1,5 +1,5 @@
 // Spojení s OBS (OBS -> Nástroje -> Nastavení WebSocket serveru). Samo se znovu připojuje.
-const { default: OBSWebSocket } = require("obs-websocket-js");
+const { default: OBSWebSocket, EventSubscription } = require("obs-websocket-js");
 const { EventEmitter } = require("events");
 const config = require("./config");
 
@@ -126,8 +126,21 @@ async function call(name, data) {
   return obs.call(name, data);
 }
 
+let wantMeters = false;
 module.exports = {
   events,
+  /** přímý odběr události z OBS (např. InputVolumeMeters) */
+  onRaw: (name, fn) => obs.on(name, fn),
+  /** zapne / vypne odběr měřáku hlasitosti (OBS ho posílá 20× za vteřinu, proto jen když je potřeba) */
+  meters: async (yes) => {
+    wantMeters = !!yes;
+    if (!connected) return;
+    try {
+      await obs.reidentify({ eventSubscriptions: EventSubscription.All | (wantMeters ? EventSubscription.InputVolumeMeters : 0) });
+    } catch {
+      /* starší OBS */
+    }
+  },
   state,
   call,
   /** aplikace teď sama spouští stream (pojistka pak okno neotevře) */

@@ -5,6 +5,7 @@ const config = require("./config");
 const obs = require("./obs");
 const api = require("./api");
 const { tr } = require("./i18n");
+const { buildScenes } = require("./scenes");
 
 const L = (cs, en) => tr(config.get().lang, cs, en);
 const POLL_MS = 3000; // panel v OBS čeká na start streamu, ať to netrvá dlouho
@@ -15,6 +16,7 @@ let pollTimer = null;
 let sceneTimer = null;
 let asker = async () => false; // okno se zeptá streamera (nastaví main.js)
 let onDone = () => {};
+let isPremium = () => false;
 const waiting = new Map(); // id -> { cmd, since } (čeká na připojení OBS)
 const handled = new Set();
 
@@ -78,6 +80,35 @@ async function handle(cmd) {
     } catch (e) {
       return report(cmd.id, "error", `${L("OBS stream nespustilo", "OBS didn't start the stream")}: ${String((e && e.message) || e).slice(0, 200)}`);
     }
+  }
+  // povel z mobilního ovladače (scéna, mikrofon, nahrávání, klip) – stejné akce jako klávesové zkratky
+  if (cmd.kind === "obs_action") {
+    handled.add(cmd.id);
+    const actions = require("./actions");
+    const action = String(p.action || "");
+    if (!["clip", "scene", "mic_toggle", "record_toggle", "replay_toggle"].includes(action)) return report(cmd.id, "error", L("Neznámý povel.", "Unknown command."));
+    if (!actions.isFree(action) && !isPremium()) return report(cmd.id, "error", L("Ovládání OBS z mobilu je součást Premium.", "OBS control from mobile is part of Premium."));
+    const r = await actions.run(action, String(p.param || ""));
+    return report(cmd.id, r.ok ? "done" : "error", String(r.message || "").slice(0, 300));
+  }
+  // scény do OBS jedním klikem (spustil je streamer sám na webu) – bez ptaní
+  if (cmd.kind === "build_scenes") {
+    if (!obs.state().connected) {
+      if (!waiting.has(cmd.id)) waiting.set(cmd.id, { cmd, since: Date.now() });
+      return;
+    }
+    waiting.delete(cmd.id);
+    handled.add(cmd.id);
+    try {
+      const msg = await buildScenes(p);
+      await report(cmd.id, "done", msg.slice(0, 480));
+      onDone({ ok: true, message: msg });
+    } catch (e) {
+      const msg = String((e && e.message) || e).slice(0, 280);
+      await report(cmd.id, "error", `${L("Scény se nepostavily", "The scenes weren't built")}: ${msg}`);
+      onDone({ ok: false, message: `${L("Scény se nepostavily", "The scenes weren't built")}: ${msg}` });
+    }
+    return;
   }
   const mode = config.get().remote.mode;
   if (cmd.kind !== "add_source" || !/^https?:\/\//i.test(String(p.url || ""))) {
@@ -162,5 +193,6 @@ module.exports = {
   },
   setAsker: (fn) => (asker = fn),
   setOnDone: (fn) => (onDone = fn),
+  setPremium: (fn) => (isPremium = fn),
   reportScenes,
 };

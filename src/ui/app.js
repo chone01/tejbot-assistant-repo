@@ -325,6 +325,11 @@ function tabObs() {
     <div class="row"><div class="path" style="flex:1">${esc(S.config.clipsDir)}</div><button class="btn" id="pickdir">${ic("folder")} ${t("Změnit", "Change")}</button><button class="btn ghost" data-run="open_clips">${t("Otevřít", "Open")}</button></div>
   </div>
   <div class="card">
+    <h2>${chip("mic")}${t("PNGtuber", "PNGtuber")}${S.premium && S.premium.active ? "" : ` <span class="tag">Premium</span>`}</h2>
+    <p class="soft">${t("Aplikace posílá hlasitost tvého mikrofonu z OBS postavičce PNGtuberu (nastavíš ji na webu TejBota). Mikrofon se bere ten, který máš vybraný u ztlumení mikrofonu, jinak první mikrofon v OBS.", "The app sends your OBS microphone volume to the PNGtuber character (set it up on the TejBot site). It uses the microphone picked for muting, otherwise the first microphone in OBS.")}</p>
+    <label class="check" style="margin-top:8px"><input type="checkbox" id="pngon" ${S.config.png && S.config.png.enabled ? "checked" : ""} ${S.premium && S.premium.active ? "" : "disabled"} /><span>${t("PNGtuber: posílat hlas do OBS", "PNGtuber: send voice to OBS")}</span></label>
+  </div>
+  <div class="card">
     <h2>${chip("radio", "red")}${t("Začít vysílat", "Go live")}</h2>
     <p class="soft">${t("Stream spouštěj tlačítkem Začít vysílat (tady v aplikaci nebo panelem TejBot v OBS), nejdřív se nastaví název a kategorie. Původní tlačítko si v OBS můžeš schovat: Doky → Ovládání (odškrtni).", "Start streams with Go live (here in the app or with the TejBot panel in OBS) so the title and category are set first. You can hide the original button in OBS: Docks → Controls (untick it).")}</p>
     <label class="check" style="margin-top:8px"><input type="checkbox" id="guard" ${S.config.golive && S.config.golive.guard === false ? "" : "checked"} /><span><b>${t("Pojistka: když pustím stream tlačítkem v OBS, otevřít okno s názvem a kategorií", "Safety net: when I start the stream with the OBS button, open the title and category window")}</b><br /><span class="muted small">${t("Stream už v tu chvíli běží, oznámení na Kicku odejde s původním názvem. Název a kategorie se změní hned po uložení.", "The stream is already running then, so the Kick notification goes out with the old title. The title and category change as soon as you save.")}</span></span></label>
@@ -873,6 +878,7 @@ function bind() {
     if (tab === "mic") void loadMic();
   });
   on("#autoreplay", "change", async (el) => apply(await tb.call("saveSettings", { obs: { autoReplay: el.checked } })));
+  on("#pngon", "change", async (el) => apply(await tb.call("saveSettings", { png: { enabled: el.checked } })));
 
   // hlas
   on("#voiceon", "change", async (el) => apply(await tb.call("saveSettings", { voice: { enabled: el.checked } })));

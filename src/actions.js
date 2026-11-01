@@ -17,6 +17,11 @@ const ACTIONS = [
   { key: "open_clips", free: true, cs: "Otevřít složku s klipy", en: "Open the clips folder" },
   { key: "golive", free: true, cs: "Začít vysílat (okno s názvem a kategorií)", en: "Go live (window with title and category)" },
   { key: "stream_stop", free: true, cs: "Ukončit vysílání", en: "End the stream" },
+  { key: "png_expr1", cs: "PNGtuber: výraz 1", en: "PNGtuber: expression 1" },
+  { key: "png_expr2", cs: "PNGtuber: výraz 2", en: "PNGtuber: expression 2" },
+  { key: "png_expr3", cs: "PNGtuber: výraz 3", en: "PNGtuber: expression 3" },
+  { key: "png_expr4", cs: "PNGtuber: výraz 4", en: "PNGtuber: expression 4" },
+  { key: "png_expr0", cs: "PNGtuber: zpět normální výraz", en: "PNGtuber: back to normal" },
   // akce na webu TejBota (nepotřebují OBS připojené k aplikaci, jen přihlášenou aplikaci)
   { key: "web:alert_skip", cs: "Alerty: přeskočit právě běžící", en: "Alerts: skip the current one" },
   { key: "web:alert_pause", cs: "Alerty: pozastavit", en: "Alerts: pause" },
@@ -148,6 +153,17 @@ async function run(action, param) {
         if (!st.outputActive) throw new Error(L("Stream teď neběží.", "The stream isn't running."));
         await obs.call("StopStream");
         message = L("Vysílání ukončeno", "Stream ended");
+        break;
+      }
+      case "png_expr0":
+      case "png_expr1":
+      case "png_expr2":
+      case "png_expr3":
+      case "png_expr4": {
+        if (!obs.state().connected) throw Object.assign(new Error("no obs"), { code: "NO_OBS" });
+        const n = Number(action.slice(-1));
+        await require("./pngtuber").expr(n);
+        message = n ? `PNGtuber: ${L("výraz", "expression")} ${n}` : L("PNGtuber: normální výraz", "PNGtuber: normal expression");
         break;
       }
       case "open_clips":

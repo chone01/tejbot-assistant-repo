@@ -3,8 +3,8 @@
 const fs = require("fs");
 const path = require("path");
 
-const LANGS = ["cs", "en", "sk", "de", "pl"];
-const NAMES = { cs: "Čeština", en: "English", sk: "Slovenčina", de: "Deutsch", pl: "Polski" };
+const LANGS = ["cs", "en", "sk", "de", "pl", "hu", "ro"];
+const NAMES = { cs: "Čeština", en: "English", sk: "Slovenčina", de: "Deutsch", pl: "Polski", hu: "Magyar", ro: "Română" };
 const raw = {};
 const compiled = {};
 const esc = (s) => s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
@@ -36,5 +36,5 @@ function fromLocale(loc) {
   const l = String(loc || "").toLowerCase().slice(0, 2);
   return LANGS.includes(l) ? l : "en";
 }
-const LOCALE = { cs: "cs-CZ", en: "en-GB", sk: "sk-SK", de: "de-DE", pl: "pl-PL" };
+const LOCALE = { cs: "cs-CZ", en: "en-GB", sk: "sk-SK", de: "de-DE", pl: "pl-PL", hu: "hu-HU", ro: "ro-RO" };
 module.exports = { LANGS, NAMES, LOCALE, tr, dict: (l) => raw[l] || (dict(l), raw[l]) || null, fromLocale };

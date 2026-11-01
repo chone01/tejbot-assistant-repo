@@ -29,6 +29,8 @@ const DEFAULTS = (lang = sysLang()) => ({
   music: { enabled: true, sources: { spotify: true, apple: true, browser: true, other: false } },
   // odkazy od pomocníků z webu: ask = vždy se zeptat, tejbot = odkazy z TejBota přidat hned, off = nepřijímat
   remote: { mode: "ask" },
+  // PNGtuber: posílat hlasitost mikrofonu z OBS do overlaye PNGtuberu
+  png: { enabled: false },
   // okno „Začít vysílat“: spustit i nahrávání, naposledy použité kategorie,
   // guard = otevřít okno, když se stream pustí tlačítkem přímo v OBS
   golive: { record: false, recent: [], guard: true },
@@ -74,7 +76,7 @@ function load() {
   } catch {
     /* první spuštění */
   }
-  cfg = { ...d, ...saved, voice: { ...d.voice, ...(saved.voice || {}) }, mic: { ...d.mic, ...(saved.mic || {}) }, obs: { ...d.obs, ...(saved.obs || {}) }, remote: { ...d.remote, ...(saved.remote || {}) }, golive: { ...d.golive, ...(saved.golive || {}) }, music: { ...d.music, ...(saved.music || {}), sources: { ...d.music.sources, ...((saved.music || {}).sources || {}) } } };
+  cfg = { ...d, ...saved, voice: { ...d.voice, ...(saved.voice || {}) }, mic: { ...d.mic, ...(saved.mic || {}) }, obs: { ...d.obs, ...(saved.obs || {}) }, remote: { ...d.remote, ...(saved.remote || {}) }, png: { ...d.png, ...(saved.png || {}) }, golive: { ...d.golive, ...(saved.golive || {}) }, music: { ...d.music, ...(saved.music || {}), sources: { ...d.music.sources, ...((saved.music || {}).sources || {}) } } };
   if (!Array.isArray(cfg.commands)) cfg.commands = d.commands;
   for (const p of SECRET) setIn(cfg, p, dec(getIn(cfg, p)));
   return cfg;

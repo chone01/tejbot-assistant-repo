@@ -13,6 +13,7 @@ const mic = require("./mic");
 const media = require("./media");
 const actions = require("./actions");
 const remote = require("./remote");
+const pngtuber = require("./pngtuber");
 
 let win = null;
 let tray = null;
@@ -173,6 +174,7 @@ async function refreshMe() {
 
 function applyState() {
   registerHotkeys();
+  void pngtuber.sync(isPrem());
   buildTray();
   if (enabled()) {
     obs.start();
@@ -235,6 +237,7 @@ let wasConnected = false;
 obs.events.on("state", (st) => {
   pushState();
   if (st.connected && !wasConnected) send("toast", { ok: true, message: L("OBS připojeno.", "OBS connected.") });
+  if (st.connected !== wasConnected) void pngtuber.sync(isPrem());
   wasConnected = st.connected;
 });
 // pojistka: stream pustil streamer tlačítkem přímo v OBS -> hned otevřít okno s názvem a kategorií
@@ -274,6 +277,7 @@ remote.setAsker(
       }, 120000);
     })
 );
+remote.setPremium(() => isPrem());
 remote.setOnDone((r) => {
   send("toast", r);
   if (!win || !win.isVisible()) actions.notify("Tejbot Assistent", r.message);
@@ -542,6 +546,11 @@ handle("saveSettings", (patch) => {
     restartVoice();
   }
   if (patch.remote && ["ask", "tejbot", "off"].includes(patch.remote.mode)) cfg.remote.mode = patch.remote.mode;
+  if (patch.png && typeof patch.png.enabled === "boolean") {
+    cfg.png.enabled = patch.png.enabled;
+    config.save();
+    void pngtuber.sync(isPrem());
+  }
   if (patch.golive && typeof patch.golive.guard === "boolean") cfg.golive.guard = patch.golive.guard;
   if (patch.obs) {
     const o = patch.obs;
