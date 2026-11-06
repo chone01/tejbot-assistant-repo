@@ -37,6 +37,20 @@ async function report(id, status, message) {
   }
 }
 
+/**
+ * Nový zdroj se v OBS přidá nahoru a mohl by zakrýt alerty (pak je slyšet jen zvuk).
+ * Zdroje s alerty TejBotu (odkaz …/alerts) proto vrátí úplně nahoru.
+ */
+async function alertsOnTop(scene) {
+  const { sceneItems } = await obs.call("GetSceneItemList", { sceneName: scene });
+  const top = sceneItems.length - 1;
+  for (const it of sceneItems) {
+    if (it.inputKind !== "browser_source") continue;
+    const url = await obs.call("GetInputSettings", { inputName: it.sourceName }).then((r) => String(r.inputSettings?.url || ""), () => "");
+    if (/\/overlay\/[^/]+\/alerts(\?|$)/.test(url)) await obs.call("SetSceneItemIndex", { sceneName: scene, sceneItemId: it.sceneItemId, sceneItemIndex: top });
+  }
+}
+
 /** Přidá (nebo u stejného názvu přepíše) zdroj Prohlížeč do OBS */
 async function addSource(p) {
   const name = String(p.name || "TejBot").slice(0, 80);
@@ -56,6 +70,7 @@ async function addSource(p) {
     if (!list.includes(scene)) throw new Error(L(`Scéna „${scene}“ v OBS není.`, `There's no scene “${scene}” in OBS.`));
   }
   await obs.call("CreateInput", { sceneName: scene, inputName: name, inputKind: "browser_source", inputSettings: settings, sceneItemEnabled: true });
+  await alertsOnTop(scene).catch(() => {});
   return L(`Přidáno do scény „${scene}“.`, `Added to scene “${scene}”.`);
 }
 
