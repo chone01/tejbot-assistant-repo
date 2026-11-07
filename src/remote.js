@@ -8,7 +8,9 @@ const { tr } = require("./i18n");
 const { buildScenes } = require("./scenes");
 
 const L = (cs, en) => tr(config.get().lang, cs, en);
-const POLL_MS = 3000; // panel v OBS čeká na start streamu, ať to netrvá dlouho
+// s připojeným OBS se ptá každých 5 s (panel v OBS čeká na start streamu), bez OBS jen každých 30 s – šetří server
+const POLL_MS = 5000;
+const POLL_IDLE_MS = 30_000;
 const WAIT_OBS_MS = 15 * 60_000; // když OBS není připojené, odkaz počká
 
 let running = false;
@@ -169,7 +171,7 @@ async function poll() {
       await report(id, "error", L("OBS nebylo připojené.", "OBS wasn't connected."));
     } else if (obs.state().connected) await handle(w.cmd);
   }
-  if (running) pollTimer = setTimeout(poll, POLL_MS);
+  if (running) pollTimer = setTimeout(poll, obs.state().connected ? POLL_MS : POLL_IDLE_MS);
 }
 
 /** Pošle webu scény (s malým zpožděním, OBS jich při změně hlásí víc najednou) */
