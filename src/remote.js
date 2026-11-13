@@ -137,7 +137,11 @@ async function handle(cmd) {
     return report(cmd.id, "declined", L("Streamer má přijímání odkazů do OBS vypnuté.", "The streamer has turned off receiving OBS links."));
   }
   if (!obs.state().connected) {
-    if (!waiting.has(cmd.id)) waiting.set(cmd.id, { cmd, since: Date.now() });
+    if (!waiting.has(cmd.id)) {
+      waiting.set(cmd.id, { cmd, since: Date.now() });
+      // ať streamer ví, že odkaz dorazil (jinak by se nic neukázalo, dokud se nepřipojí OBS)
+      onDone({ ok: false, message: L(`${cmd.by_name ? `${cmd.by_name} posílá` : "Přišel"} odkaz do OBS („${p.name || "TejBot"}“). Přidá se, jakmile se aplikace připojí k OBS.`, `${cmd.by_name ? `${cmd.by_name} sent` : "Got"} an OBS link (“${p.name || "TejBot"}”). It's added once the app connects to OBS.`) });
+    }
     return;
   }
   waiting.delete(cmd.id);

@@ -307,7 +307,8 @@ function tabObs() {
       <div><label class="f">${t("Adresa", "Address")}</label><input type="text" id="obsurl" value="${esc(o.url)}" /></div>
       <div><label class="f">${t("Heslo", "Password")}</label><input type="password" id="obspw" placeholder="${S.hasObsPassword ? t("uložené (napiš nové pro změnu)", "saved (type a new one to change)") : ""}" /></div>
     </div>
-    <div style="margin-top:14px"><button class="btn primary" id="saveobs">${ic("link")} ${t("Uložit a připojit", "Save and connect")}</button></div>
+    <div class="row" style="margin-top:14px;gap:8px;flex-wrap:wrap"><button class="btn primary" id="saveobs">${ic("link")} ${t("Uložit a připojit", "Save and connect")}</button>${S.obs.connected ? "" : `<button class="btn" id="obsauto">${ic("refresh")} ${t("Nastavit automaticky", "Set up automatically")}</button>`}</div>
+    ${S.obs.connected ? "" : `<p class="muted small" style="margin-top:6px">${t("Aplikace najde heslo v OBS sama, a když je WebSocket vypnutý, zapne ho.", "The app finds the password in OBS itself and turns the WebSocket on if it's off.")}</p>`}
     <details class="more" ${S.obs.connected ? "" : "open"}>
       <summary>${ic("info")} ${t("Jak zapnout WebSocket server v OBS", "How to enable the WebSocket server in OBS")}</summary>
       <ol class="steps">
@@ -867,6 +868,11 @@ function bind() {
 
   // OBS
   on("#obsre", "click", () => tb.call("obsReconnect"));
+  on("#obsauto", "click", async () => {
+    const r = await tb.call("obsAutoSetup");
+    if (r && r.state) apply(r.state);
+    toast({ ok: !!(r && r.ok), message: (r && r.message) || t("Nepovedlo se.", "That didn't work.") });
+  });
   on("#saveobs", "click", async () => {
     const pw = document.getElementById("obspw").value;
     apply(await tb.call("saveSettings", { obs: { url: document.getElementById("obsurl").value, ...(pw ? { password: pw } : {}) } }));

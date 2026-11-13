@@ -14,6 +14,7 @@ const media = require("./media");
 const actions = require("./actions");
 const remote = require("./remote");
 const pngtuber = require("./pngtuber");
+const obsSetup = require("./obs-setup");
 
 let win = null;
 let tray = null;
@@ -652,6 +653,11 @@ handle("obsLists", async () => {
   }
 });
 handle("obsReconnect", () => obs.reconnect());
+// tlačítko „Nastavit automaticky“: najde (a případně zapne) WebSocket v OBS a vyplní heslo
+handle("obsAutoSetup", async () => {
+  const r = await autoObs(true);
+  return { ...r, state: fullState() };
+});
 // presety mikrofonu (filtry v OBS)
 handle("micStatus", () => mic.status());
 handle("micApply", (preset, values, disableOthers) => (isPrem() ? mic.apply(preset, values, disableOthers) : { ok: false, message: PREMIUM_MSG() }));
@@ -792,8 +798,39 @@ handle("installUpdate", () => {
 });
 
 // ------------------------------------------------------------ start
+/**
+ * Automatické připojení k OBS. Při startu jen jednou a jen když heslo ještě není vyplněné (nic nepřepíše).
+ * Vrátí { ok, message } pro okno; když to nejde (OBS tu není, starší OBS), tiše přeskočí.
+ */
+async function autoObs(manual = false) {
+  const cfg = config.get();
+  if (!manual && (cfg.obs.password || cfg.obs.autoSetup)) return { ok: false, message: "" };
+  const r = await obsSetup.setup().catch(() => ({ skip: "error" }));
+  cfg.obs.autoSetup = true;
+  if (r.skip) {
+    config.save();
+    return { ok: false, message: L("OBS na tomhle počítači nenašel (nebo je starší než verze 28). Heslo vyplň ručně.", "Couldn't find OBS on this computer (or it's older than version 28). Fill in the password manually.") };
+  }
+  cfg.obs.url = r.url;
+  cfg.obs.password = r.password;
+  config.save();
+  obs.reconnect();
+  pushState();
+  const message = r.changed
+    ? r.restart
+      ? L("WebSocket v OBS je zapnutý a heslo vyplněné. Restartuj OBS, pak se aplikace připojí sama.", "The WebSocket in OBS is on and the password filled in. Restart OBS and the app connects by itself.")
+      : L("WebSocket v OBS je zapnutý a heslo vyplněné. Až OBS spustíš, aplikace se připojí sama.", "The WebSocket in OBS is on and the password filled in. When you start OBS, the app connects by itself.")
+    : L("Heslo z OBS je vyplněné, připojuji se…", "The OBS password is filled in, connecting…");
+  if (!manual) {
+    send("toast", { ok: true, message });
+    if (r.restart) actions.notify("Tejbot Assistent", message);
+  }
+  return { ok: true, message };
+}
+
 app.whenReady().then(async () => {
   config.load();
+  await autoObs().catch(() => {});
   // mikrofon smí jen vlastní okna aplikace (hlasové povely)
   session.defaultSession.setPermissionRequestHandler((wc, permission, cb) => cb(permission === "media" && wc.getURL().startsWith("file:")));
   session.defaultSession.setPermissionCheckHandler((wc, permission) => permission === "media" && !!wc && wc.getURL().startsWith("file:"));
