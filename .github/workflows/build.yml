@@ -4,7 +4,8 @@ name: Sestavit aplikaci
 
 on:
   push:
-    branches: [main]
+    # main = vydání pro všechny; assistent-redesign = testovací verze (předběžné vydání, aktualizace ji ostatním nenabídne)
+    branches: [main, assistent-redesign]
   workflow_dispatch:
 
 permissions:
@@ -66,8 +67,9 @@ jobs:
           merge-multiple: true
       - uses: softprops/action-gh-release@v2
         with:
-          tag_name: v1.0.${{ github.run_number }}
-          name: Tejbot Assistent 1.0.${{ github.run_number }}
-          body: Automaticky sestavená verze. Návod k instalaci je na https://tejbot.eu/stahnout
-          make_latest: "true"
+          tag_name: v1.0.${{ github.run_number }}${{ github.ref_name != 'main' && '-test' || '' }}
+          name: Tejbot Assistent 1.0.${{ github.run_number }}${{ github.ref_name != 'main' && ' (testovací verze)' || '' }}
+          body: ${{ github.ref_name != 'main' && 'Testovací verze – jen pro vyzkoušení, automatická aktualizace ji ostatním nenabízí.' || 'Automaticky sestavená verze. Návod k instalaci je na https://tejbot.eu/stahnout' }}
+          prerelease: ${{ github.ref_name != 'main' }}
+          make_latest: ${{ github.ref_name == 'main' && 'true' || 'false' }}
           files: out/*
