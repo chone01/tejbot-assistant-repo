@@ -34,6 +34,9 @@ const DEFAULTS = (lang = sysLang()) => ({
   // okno „Začít vysílat“: spustit i nahrávání, naposledy použité kategorie,
   // guard = otevřít okno, když se stream pustí tlačítkem přímo v OBS
   golive: { record: false, recent: [], guard: true },
+  // multistream: platformy s klíči ke streamu (klíče se ukládají zašifrované), poslední test uploadu,
+  // prevService = původní nastavení streamu v OBS (vrátí se po vypnutí multistreamu)
+  multi: { enabled: false, targets: { kick: { on: false, key: "", server: "" }, twitch: { on: false, key: "", server: "" }, youtube: { on: false, key: "", server: "" } }, upload: null, prevService: null },
   commands: [
     // hlasové povely umí čeština a angličtina (ostatní jazyky mají anglické povely)
     { id: randomUUID(), name: tr(lang, "Udělej klip", "Make a clip"), phrase: lang === "cs" ? "udělej klip" : "make a clip", hotkey: "", action: "clip", param: "" },
@@ -42,7 +45,7 @@ const DEFAULTS = (lang = sysLang()) => ({
   ],
 });
 
-const SECRET = [["token"], ["obs", "password"]];
+const SECRET = [["token"], ["obs", "password"], ["multi", "targets", "kick", "key"], ["multi", "targets", "twitch", "key"], ["multi", "targets", "youtube", "key"]];
 const canEncrypt = () => {
   try {
     return safeStorage.isEncryptionAvailable();
@@ -76,7 +79,7 @@ function load() {
   } catch {
     /* první spuštění */
   }
-  cfg = { ...d, ...saved, voice: { ...d.voice, ...(saved.voice || {}) }, mic: { ...d.mic, ...(saved.mic || {}) }, obs: { ...d.obs, ...(saved.obs || {}) }, remote: { ...d.remote, ...(saved.remote || {}) }, png: { ...d.png, ...(saved.png || {}) }, golive: { ...d.golive, ...(saved.golive || {}) }, music: { ...d.music, ...(saved.music || {}), sources: { ...d.music.sources, ...((saved.music || {}).sources || {}) } } };
+  cfg = { ...d, ...saved, voice: { ...d.voice, ...(saved.voice || {}) }, mic: { ...d.mic, ...(saved.mic || {}) }, obs: { ...d.obs, ...(saved.obs || {}) }, remote: { ...d.remote, ...(saved.remote || {}) }, png: { ...d.png, ...(saved.png || {}) }, golive: { ...d.golive, ...(saved.golive || {}) }, multi: { ...d.multi, ...(saved.multi || {}), targets: { kick: { ...d.multi.targets.kick, ...(((saved.multi || {}).targets || {}).kick || {}) }, twitch: { ...d.multi.targets.twitch, ...(((saved.multi || {}).targets || {}).twitch || {}) }, youtube: { ...d.multi.targets.youtube, ...(((saved.multi || {}).targets || {}).youtube || {}) } } }, music: { ...d.music, ...(saved.music || {}), sources: { ...d.music.sources, ...((saved.music || {}).sources || {}) } } };
   if (!Array.isArray(cfg.commands)) cfg.commands = d.commands;
   for (const p of SECRET) setIn(cfg, p, dec(getIn(cfg, p)));
   return cfg;

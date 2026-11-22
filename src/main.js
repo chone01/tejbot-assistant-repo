@@ -15,6 +15,7 @@ const actions = require("./actions");
 const remote = require("./remote");
 const pngtuber = require("./pngtuber");
 const obsSetup = require("./obs-setup");
+const multi = require("./multistream");
 
 let win = null;
 let tray = null;
@@ -201,7 +202,9 @@ function fullState() {
     site: api.SITE,
     web: webState,
     premium,
-    config: { ...cfg, token: undefined, obs: { ...cfg.obs, password: cfg.obs.password ? "••••••" : "" } },
+    config: { ...cfg, token: undefined, obs: { ...cfg.obs, password: cfg.obs.password ? "••••••" : "" }, multi: undefined },
+    // multistream bez klíčů ke streamu
+    multi: multi.view(),
     // překlady pro okno (jen pro slovenštinu, němčinu a polštinu)
     i18n: ["sk", "de", "pl"].includes(cfg.lang) ? require("./i18n").dict(cfg.lang) : null,
     hasObsPassword: !!cfg.obs.password,
@@ -636,6 +639,11 @@ handle("goLive", async (o) => {
     const st = await obs.call("GetStreamStatus");
     already = !!st.outputActive;
     if (!already) {
+      // multistream: OBS ať míří na Assistenta a přeposílání poslouchá
+      if (cfg.multi && cfg.multi.enabled) {
+        await multi.sync();
+        await new Promise((r) => setTimeout(r, 700));
+      }
       obs.markSelfStart();
       await obs.call("StartStream");
     }
@@ -645,6 +653,26 @@ handle("goLive", async (o) => {
   if (opt.record) await obs.call("StartRecord").catch(() => {});
   return { ok: true, warn: !!warn, message: warn || (already ? L("Název a kategorie jsou uložené.", "The title and category are saved.") : L("Vysíláš! Ať se stream daří.", "You're live! Have a great stream.")) };
 });
+// multistream
+multi.events.on("status", () => pushState());
+handle("multiSave", async (patch) => {
+  try {
+    await multi.save(patch && typeof patch === "object" ? patch : {});
+    return { ok: true, state: fullState() };
+  } catch (e) {
+    return { ok: false, message: String((e && e.message) || e).slice(0, 200), state: fullState() };
+  }
+});
+handle("uploadTest", async () => {
+  try {
+    const mbps = await multi.uploadTest();
+    const kbps = obs.state().connected ? await multi.obsBitrate() : 6000;
+    return { ok: true, mbps, kbps, state: fullState() };
+  } catch (e) {
+    return { ok: false, message: L("Test uploadu se nepovedl. Zkontroluj internet a zkus to znovu.", "The upload test failed. Check your internet and try again."), state: fullState() };
+  }
+});
+handle("obsBitrate", async () => (obs.state().connected ? multi.obsBitrate() : 6000));
 handle("obsLists", async () => {
   try {
     return await obs.lists();
@@ -845,10 +873,20 @@ app.whenReady().then(async () => {
 app.on("window-all-closed", () => {
   /* běží dál u hodin */
 });
-app.on("before-quit", () => {
+let multiRestored = false;
+app.on("before-quit", (e) => {
   quitting = true;
   stopVoice();
   media.stop();
   remote.stop();
+  // multistream: bez Assistenta by OBS posílal stream do prázdna → vrátit OBS původní nastavení (max. 1,5 s)
+  if (!multiRestored && config.get().multi && config.get().multi.prevService && !obs.state().streaming) {
+    e.preventDefault();
+    multiRestored = true;
+    multi.stop();
+    Promise.race([multi.restore(), new Promise((r) => setTimeout(r, 1500))]).finally(() => app.quit());
+    return;
+  }
+  multi.stop();
 });
 app.on("will-quit", () => globalShortcut.unregisterAll());

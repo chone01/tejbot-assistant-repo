@@ -67,6 +67,7 @@ const ICONS = {
   link: '<path d="M10 13a5 5 0 0 0 7.5.5l3-3a5 5 0 0 0-7-7l-1.8 1.7M14 11a5 5 0 0 0-7.5-.5l-3 3a5 5 0 0 0 7 7l1.7-1.7"/>',
   zap: '<path d="M13 2 3 14h9l-1 8 10-12h-9z"/>',
   bulb: '<path d="M9 18h6M10 22h4M12 2a7 7 0 0 0-4 12.7V17h8v-2.3A7 7 0 0 0 12 2z"/>',
+  gauge: '<path d="m12 14 4-4"/><path d="M3.34 19a10 10 0 1 1 17.32 0"/>',
   radio: '<path d="M4.9 19.1a10 10 0 0 1 0-14.2M7.8 16.2a6 6 0 0 1 0-8.4M16.2 7.8a6 6 0 0 1 0 8.4M19.1 4.9a10 10 0 0 1 0 14.2"/><circle cx="12" cy="12" r="2"/>',
   monitorup: '<path d="m9 10 3-3 3 3M12 13V7"/><rect x="2" y="3" width="20" height="14" rx="2"/><path d="M12 17v4M8 21h8"/>',
   film: '<rect x="3" y="3" width="18" height="18" rx="2.5"/><path d="M7 3v18M17 3v18M3 7.5h4M3 12h18M3 16.5h4M17 7.5h4M17 16.5h4"/>',
@@ -75,7 +76,7 @@ const ic = (n, cls = "") => `<svg class="i ${cls}" viewBox="0 0 24 24" aria-hidd
 const chip = (n, tone = "") => `<span class="chip ${tone}">${ic(n)}</span>`;
 // Aplikace je zdarma; Premium odemyká ovládání OBS a webu zkratkou, hlas, hudbu, presety a odkazy od pomocníků
 const PREM = () => !!(S && S.premium && S.premium.active);
-const PREM_TABS = ["voice", "mic", "music"];
+const PREM_TABS = ["mic", "music"];
 const isFreeAction = (key) => (S.actions.find((a) => a.key === key) || {}).free === true;
 const premTag = () => `<span class="tag gold">${ic("crown")} Premium</span>`;
 function lockCard(text) {
@@ -85,7 +86,7 @@ function lockCard(text) {
 function lockedTab(k) {
   const info = {
     voice: [t("Hlasové povely", "Voice commands"), t("Řekneš větu a aplikace udělá akci. Hlasové povely jsou součást Premium.", "Say a phrase and the app does the action. Voice commands are part of Premium.")],
-    mic: [t("Zvuk mikrofonu", "Microphone sound"), t("Presety zvuku mikrofonu přímo v OBS (vlastní i komunitní) jsou součást Premium.", "Microphone sound presets right in OBS (your own and community ones) are part of Premium.")],
+    mic: [t("Mikrofon", "Microphone"), t("Presety zvuku mikrofonu přímo v OBS (vlastní i komunitní) jsou součást Premium.", "Microphone sound presets right in OBS (your own and community ones) are part of Premium.")],
     music: [t("Hudba ve streamu", "Music on stream"), t("Widget „Co poslouchám“ ukazuje ve streamu skladbu, která ti hraje. Je součást Premium.", "The “Listening to” widget shows the track you're playing on stream. It's part of Premium.")],
   }[k];
   return `<div class="head"><h1>${info[0]} ${premTag()}</h1></div>${lockCard(info[1])}<p class="muted small">${t("Začít vysílat, klipy a ukládání klipů zkratkou máš zdarma.", "Go live, clips and saving clips with a hotkey are free.")}</p>`;
@@ -181,9 +182,10 @@ function screenSetup() {
 // menu po skupinách: [klíč, ikona, název]
 const NAV = () => [
   ["", [["home", "home", t("Přehled", "Overview")]]],
-  [t("Ovládání", "Control"), [["cmds", "keyboard", t("Příkazy a zkratky", "Commands & hotkeys")], ["voice", "wave", t("Hlasové povely", "Voice commands")]]],
-  [t("Stream", "Stream"), [["obs", "obs", t("OBS a klipy", "OBS & clips")], ["mic", "sliders", t("Zvuk mikrofonu", "Microphone sound")], ["music", "music", t("Hudba ve streamu", "Music on stream")]]],
-  [t("Aplikace", "App"), [["settings", "settings", t("Nastavení", "Settings")]]],
+  [t("Stream", "Stream"), [["stream", "radio", t("Vysílání a multistream", "Streaming & multistream")], ["clips", "film", t("Klipy", "Clips")], ["obs", "monitorup", t("Do OBS", "To OBS")]]],
+  [t("Zvuk", "Sound"), [["mic", "sliders", t("Mikrofon", "Microphone")], ["music", "music", t("Hudba ve streamu", "Music on stream")]]],
+  [t("Ovládání", "Control"), [["controls", "keyboard", t("Zkratky a hlas", "Hotkeys & voice")]]],
+  [t("Aplikace", "App"), [["settings", "settings", t("Nastavení a OBS", "Settings & OBS")]]],
 ];
 const TABS = () => NAV().flatMap(([, items]) => items);
 
@@ -228,13 +230,13 @@ function tabHome() {
   <div class="grid">
     ${PREM() ? `<div class="stat premium"><div class="k">${ic("crown")} TejBot</div><div class="v"><span class="dot ok"></span><span class="t">Premium${until ? ` · ${esc(until)}` : ""}</span></div></div>` : `<div class="stat"><div class="k">${ic("crown")} TejBot</div><div class="v"><span class="dot"></span><span class="t">${t("Zdarma", "Free")} · <a data-open="/dashboard/${esc(S.config.channel.id)}/premium">Premium ›</a></span></div></div>`}
     <div class="stat"><div class="k">${ic("obs")} OBS</div><div class="v"><span class="dot ${oc}"></span><span class="t">${ol}${S.obs.streaming ? ` · <b class="livetxt">${t("ŽIVĚ", "LIVE")}</b>` : ""}</span></div></div>
-    <div class="stat"><div class="k">${ic("music")} ${t("Právě hraje", "Now playing")}</div><div class="v"><span class="dot ${tr ? "ok" : ""}"></span><span class="t">${!PREM() ? "Premium" : tr ? esc(`${tr.artist ? `${tr.artist} – ` : ""}${tr.title}`) : S.config.music.enabled ? t("Nic", "Nothing") : t("Vypnuto", "Off")}</span></div></div>
+    <div class="stat"><div class="k">${ic("radio")} Multistream</div><div class="v"><span class="dot ${S.multi.enabled ? (S.multi.state === "error" ? "bad" : "ok") : ""}"></span><span class="t">${S.multi.enabled ? `${multiCount()} ${t(multiCount() === 1 ? "platforma" : "platformy", multiCount() === 1 ? "platform" : "platforms")} · ${t("z PC", "from PC")}` : `<a data-tab="stream">${t("Zapnout", "Turn on")} ›</a>`}</span></div></div>
   </div>
-  ${!S.obs.connected ? `<div class="card warnc"><div class="row sp"><div><h2 style="margin-bottom:4px">${chip("alert", "gold")}${t("OBS zatím není připojené", "OBS isn't connected yet")}</h2><p class="soft">${t("Spusť OBS a zapni v něm WebSocket server. Bez něj nejdou klipy ani ovládání OBS.", "Start OBS and enable its WebSocket server. Clips and OBS control need it.")}</p></div><button class="btn" data-tab="obs">${t("Jak na to", "How to")} ›</button></div></div>` : ""}
+  ${!S.obs.connected ? `<div class="card warnc"><div class="row sp"><div><h2 style="margin-bottom:4px">${chip("alert", "gold")}${t("OBS zatím není připojené", "OBS isn't connected yet")}</h2><p class="soft">${t("Spusť OBS a zapni v něm WebSocket server. Bez něj nejdou klipy ani ovládání OBS.", "Start OBS and enable its WebSocket server. Clips and OBS control need it.")}</p></div><button class="btn" data-tab="settings">${t("Jak na to", "How to")} ›</button></div></div>` : ""}
   <div class="card">
     <h2>${chip("zap")}${t("Rychlé akce", "Quick actions")}</h2>
     <div class="golive ${S.obs.streaming ? "on" : ""}">
-      <div><b>${S.obs.streaming ? t("Právě vysíláš", "You're live") : t("Připraven na stream?", "Ready to stream?")}</b><span class="muted small">${S.obs.streaming ? t("Stream běží v OBS.", "The stream is running in OBS.") : t("Nejdřív si nastavíš název a kategorii, stream začne až potom.", "Set the title and category first, the stream starts after that.")}</span></div>
+      <div><b>${S.obs.streaming ? t("Právě vysíláš", "You're live") : t("Připraven na stream?", "Ready to stream?")}</b><span class="muted small">${S.obs.streaming ? t("Stream běží v OBS.", "The stream is running in OBS.") : t("Nejdřív si nastavíš název a kategorii, stream začne až potom.", "Set the title and category first, the stream starts after that.")}</span>${S.multi.enabled ? `<span class="pchips">${platChips()}</span>` : ""}</div>
       ${S.obs.streaming ? `<span class="row" style="gap:8px"><button class="btn" id="golive">${ic("edit")} ${t("Název a kategorie", "Title & category")}</button><button class="btn danger" id="stopstream">${ic("power")} ${t("Ukončit vysílání", "End stream")}</button></span>` : `<button class="btn live" id="golive" ${S.obs.connected ? "" : "disabled"}>${ic("radio")} ${t("Začít vysílat", "Go live")} ${hotkeyOf("golive")}</button>`}
     </div>
     <div class="actions">
@@ -245,29 +247,33 @@ function tabHome() {
     </div>
   </div>
   <div class="card">
-    <div class="row sp" style="margin-bottom:12px"><h2 style="margin:0">${chip("film")}${t("Moje klipy", "My clips")} ${S.clips.length ? `<span class="tag">${S.clips.length}</span>` : ""}</h2><button class="btn sm" data-run="open_clips">${ic("folder")} ${t("Otevřít složku", "Open folder")}</button></div>
-    ${
-      S.clips.length
-        ? `<div class="clipgrid">${S.clips
-            .map(
-              (c) => `<div class="clip">
-            <button class="thumb" data-play="${esc(c.name)}" title="${t("Přehrát", "Play")}"><video src="tbclip://clip/${encodeURIComponent(c.name)}#t=1" preload="metadata" muted tabindex="-1"></video><span class="play"><span>${ic("play")}</span></span></button>
-            <div class="cname" title="${esc(c.name)}">${esc(c.name)}</div>
-            <div class="row sp"><span class="muted small">${when(c.at)} · ${(c.size / 1048576).toFixed(1)} MB</span>
-            <span class="row" style="gap:4px"><button class="btn sm icon ghost" data-show="${esc(c.name)}" title="${t("Ukázat ve složce", "Show in folder")}">${ic("folder")}</button><button class="btn sm icon danger" data-trash="${esc(c.name)}" title="${t("Smazat (do koše)", "Delete (to the bin)")}">${ic("trash")}</button></span></div>
-          </div>`
-            )
-            .join("")}</div>`
-        : `<div class="empty">${chip("film", "cyan")}<p>${t("Zatím žádný klip. Ulož první tlačítkem „Uložit klip“ nebo zkratkou.", "No clips yet. Save your first with “Save a clip” or a hotkey.")}</p><div class="path">${esc(S.config.clipsDir)}</div></div>`
-    }
+    <div class="row sp" style="margin-bottom:12px"><h2 style="margin:0">${chip("film")}${t("Poslední klipy", "Latest clips")} ${S.clips.length ? `<span class="tag">${S.clips.length}</span>` : ""}</h2><button class="btn sm" data-tab="clips">${t("Všechny klipy", "All clips")} ›</button></div>
+    ${clipGrid(4)}
   </div>`;
+}
+
+/** mřížka klipů (max = kolik ukázat) */
+function clipGrid(max = 0) {
+  const list = max ? S.clips.slice(0, max) : S.clips;
+  return list.length
+    ? `<div class="clipgrid">${list
+        .map(
+          (c) => `<div class="clip">
+        <button class="thumb" data-play="${esc(c.name)}" title="${t("Přehrát", "Play")}"><video src="tbclip://clip/${encodeURIComponent(c.name)}#t=1" preload="metadata" muted tabindex="-1"></video><span class="play"><span>${ic("play")}</span></span></button>
+        <div class="cname" title="${esc(c.name)}">${esc(c.name)}</div>
+        <div class="row sp"><span class="muted small">${when(c.at)} · ${(c.size / 1048576).toFixed(1)} MB</span>
+        <span class="row" style="gap:4px"><button class="btn sm icon ghost" data-show="${esc(c.name)}" title="${t("Ukázat ve složce", "Show in folder")}">${ic("folder")}</button><button class="btn sm icon danger" data-trash="${esc(c.name)}" title="${t("Smazat (do koše)", "Delete (to the bin)")}">${ic("trash")}</button></span></div>
+      </div>`
+        )
+        .join("")}</div>`
+    : `<div class="empty">${chip("film")}<p>${t("Zatím žádný klip. Ulož první tlačítkem „Uložit klip“ nebo zkratkou.", "No clips yet. Save your first with “Save a clip” or a hotkey.")}</p><div class="path">${esc(S.config.clipsDir)}</div></div>`;
 }
 
 function actionSelect(c, i) {
   return `<select data-cmd="${i}" data-k="action">${S.actions.map((a) => `<option value="${a.key}" ${a.key === c.action ? "selected" : ""}>${esc(t(a.cs, a.en))}${!a.free && !PREM() ? " · Premium" : ""}</option>`).join("")}</select>`;
 }
 function tabCmds() {
-  return `<div class="head"><h1>${t("Příkazy a zkratky", "Commands & hotkeys")}</h1><p class="muted">${t("Každý příkaz má akci a způsob, jak ji spustit: klávesovou zkratku, která funguje i ve hře, a větu pro hlas.", "Each command has an action and a way to trigger it: a hotkey that works in-game too, and a phrase for voice.")}</p></div>
+  return `<div class="head"><h1>${t("Zkratky a hlas", "Hotkeys & voice")}</h1><p class="muted">${t("Každý příkaz má akci a způsob, jak ji spustit: klávesovou zkratku, která funguje i ve hře, a větu pro hlas.", "Each command has an action and a way to trigger it: a hotkey that works in-game too, and a phrase for voice.")}</p></div>
   ${PREM() ? "" : `<div class="note" style="margin:0 0 14px">${ic("crown")}<span>${t("Zdarma fungují zkratky pro klip, Začít vysílat, Ukončit vysílání, záznam do paměti a složku s klipy. Ostatní akce a hlasové povely jsou součást Premium.", "Free hotkeys: clip, Go live, End stream, Replay Buffer and the clips folder. Other actions and voice commands are part of Premium.")}</span></div>`}
   <div class="card">
     <h2>${chip("keyboard")}${t("Tvoje příkazy", "Your commands")} <span class="tag">${cmds.length}</span></h2>
@@ -291,14 +297,14 @@ function tabCmds() {
       <button class="btn primary" id="savecmds">${ic("check")} ${t("Uložit příkazy", "Save commands")}</button>
     </div>
   </div>
-  <p class="muted small">${t("Zkratku smažeš klávesou Backspace. Hlasové povely zapneš v části Hlasové povely.", "Clear a hotkey with Backspace. Turn voice commands on under Voice commands.")}</p>`;
+  <p class="muted small">${t("Zkratku smažeš klávesou Backspace. Hlasové povely zapneš na záložce Hlasové povely.", "Clear a hotkey with Backspace. Turn voice commands on in the Voice commands tab.")}</p>`;
 }
 
-function tabObs() {
+// ---------------------------------------------------------------- karty (každá patří na jednu stránku)
+function obsConnCard() {
   const [oc, ol] = obsLabel();
   const o = S.config.obs;
-  return `<div class="head"><h1>${t("OBS a klipy", "OBS & clips")}</h1><p class="muted">${t("Aplikace ovládá tvoje OBS přes vestavěný WebSocket server (OBS 28 a novější) a ukládá z něj klipy.", "The app controls your OBS through its built-in WebSocket server (OBS 28 or newer) and saves clips from it.")}</p></div>
-  <div class="card ${S.obs.connected ? "glow" : ""}">
+  return `  <div class="card ${S.obs.connected ? "glow" : ""}">
     <div class="row sp"><h2 style="margin:0">${chip("obs")}${t("Připojení k OBS", "OBS connection")}<span class="tag ${S.obs.connected ? "ok" : ""}"><span class="dot ${oc}"></span>${ol}</span></h2><button class="btn sm" id="obsre">${ic("refresh")} ${t("Připojit znovu", "Reconnect")}</button></div>
     ${!S.obs.connected && !S.obs.connecting && S.obs.error === "password" ? `<div class="note">${ic("alert")}<span>${S.hasObsPassword ? t("OBS heslo odmítlo. Zkopíruj ho v OBS znovu (Zobrazit informace o připojení → Kopírovat) a vlož sem.", "OBS rejected the password. Copy it again in OBS (Show Connect Info → Copy) and paste it here.") : t("OBS chce heslo. Vlož ho níže.", "OBS wants a password. Paste it below.")}</span></div>` : ""}
     ${!S.obs.connected && !S.obs.connecting && S.obs.error === "offline" ? `<div class="note">${ic("alert")}<span>${t("K OBS se nejde připojit. Běží OBS a je v něm zapnutý WebSocket server?", "Can't connect to OBS. Is OBS running with the WebSocket server enabled?")}</span></div>` : ""}
@@ -318,25 +324,38 @@ function tabObs() {
       </ol>
     </details>
   </div>
-  <div class="card">
-    <h2>${chip("scissors")}${t("Klipy", "Clips")}</h2>
+`;
+}
+function clipsSettingsCard() {
+  const o = S.config.obs;
+  return `  <div class="card">
+    <h2>${chip("scissors")}${t("Nastavení klipů", "Clip settings")}</h2>
     <p class="soft">${t("Klip je posledních pár vteřin, které OBS drží v paměti (v OBS se to jmenuje „Záznam do paměti“). Délku nastavíš v OBS: Nastavení → Výstup → Záznam do paměti → zaškrtni „Povolit záznam do paměti“ a zvol třeba 30 s.", "A clip is the last few seconds OBS keeps in memory (Replay Buffer). Set the length in OBS: Settings → Output → Replay Buffer → tick “Enable” and choose e.g. 30 s.")}</p>
     <label class="check" style="margin-top:8px"><input type="checkbox" id="autoreplay" ${o.autoReplay ? "checked" : ""} /><span>${t("Zapínat záznam do paměti automaticky, když se aplikace připojí k OBS", "Start the Replay Buffer automatically when the app connects to OBS")}</span></label>
     <label class="f" style="margin-top:12px">${t("Klipy se ukládají do", "Clips are saved to")}</label>
     <div class="row"><div class="path" style="flex:1">${esc(S.config.clipsDir)}</div><button class="btn" id="pickdir">${ic("folder")} ${t("Změnit", "Change")}</button><button class="btn ghost" data-run="open_clips">${t("Otevřít", "Open")}</button></div>
   </div>
-  <div class="card">
-    <h2>${chip("mic")}${t("PNGtuber", "PNGtuber")}${S.premium && S.premium.active ? "" : ` <span class="tag">Premium</span>`}</h2>
+`;
+}
+function pngCard() {
+  return `  <div class="card">
+    <h2>${chip("mic")}${t("PNGtuber", "PNGtuber")}${PREM() ? "" : ` ${premTag()}`}</h2>
     <p class="soft">${t("Aplikace posílá hlasitost tvého mikrofonu z OBS postavičce PNGtuberu (nastavíš ji na webu TejBota). Mikrofon se bere ten, který máš vybraný u ztlumení mikrofonu, jinak první mikrofon v OBS.", "The app sends your OBS microphone volume to the PNGtuber character (set it up on the TejBot site). It uses the microphone picked for muting, otherwise the first microphone in OBS.")}</p>
     <label class="check" style="margin-top:8px"><input type="checkbox" id="pngon" ${S.config.png && S.config.png.enabled ? "checked" : ""} ${S.premium && S.premium.active ? "" : "disabled"} /><span>${t("PNGtuber: posílat hlas do OBS", "PNGtuber: send voice to OBS")}</span></label>
   </div>
-  <div class="card">
+`;
+}
+function goliveCard() {
+  return `  <div class="card">
     <h2>${chip("radio", "red")}${t("Začít vysílat", "Go live")}</h2>
     <p class="soft">${t("Stream spouštěj tlačítkem Začít vysílat (tady v aplikaci nebo panelem TejBot v OBS), nejdřív se nastaví název a kategorie. Původní tlačítko si v OBS můžeš schovat: Doky → Ovládání (odškrtni).", "Start streams with Go live (here in the app or with the TejBot panel in OBS) so the title and category are set first. You can hide the original button in OBS: Docks → Controls (untick it).")}</p>
     <label class="check" style="margin-top:8px"><input type="checkbox" id="guard" ${S.config.golive && S.config.golive.guard === false ? "" : "checked"} /><span><b>${t("Pojistka: když pustím stream tlačítkem v OBS, otevřít okno s názvem a kategorií", "Safety net: when I start the stream with the OBS button, open the title and category window")}</b><br /><span class="muted small">${t("Stream už v tu chvíli běží, oznámení na Kicku odejde s původním názvem. Název a kategorie se změní hned po uložení.", "The stream is already running then, so the Kick notification goes out with the old title. The title and category change as soon as you save.")}</span></span></label>
     <p style="margin-top:8px"><a data-open="/dashboard/${esc(S.config.channel.id)}/assistant">${t("Panel TejBot do OBS najdeš na webu v Aplikace do PC", "Find the TejBot panel for OBS on the website under Desktop app")} ›</a></p>
   </div>
-  <div class="card">
+`;
+}
+function remoteCard() {
+  return `  <div class="card">
     <h2>${chip("monitorup")}${t("Odkazy od pomocníků", "Links from editors")} ${PREM() ? "" : premTag()}</h2>
     <p class="soft">${t("Pomocníci kanálu (i ty sám) můžou na webu TejBota u odkazu do OBS kliknout na „Do OBS“ a aplikace ho přidá do OBS jako zdroj Prohlížeč.", "Channel editors (and you) can click “To OBS” next to an OBS link on the TejBot website and the app adds it to OBS as a Browser source.")}</p>
     ${[
@@ -349,6 +368,94 @@ function tabObs() {
       .join("")}
     ${PREM() ? "" : `<p class="muted small" style="margin-top:8px">${ic("crown")} ${t("Posílání odkazů do OBS od pomocníků je součást Premium.", "OBS links from editors are part of Premium.")}</p>`}
   </div>`;
+}
+
+function tabClips() {
+  return `<div class="head"><h1>${t("Klipy", "Clips")}</h1><p class="muted">${t("Klip uložíš tlačítkem na Přehledu nebo zkratkou. Ukládá se posledních pár vteřin, které OBS drží v paměti.", "Save a clip with the button on the Overview or a hotkey. It saves the last few seconds OBS keeps in memory.")}</p></div>
+  <div class="card">
+    <div class="row sp" style="margin-bottom:12px"><h2 style="margin:0">${chip("film")}${t("Moje klipy", "My clips")} ${S.clips.length ? `<span class="tag">${S.clips.length}</span>` : ""}</h2><span class="row" style="gap:6px"><button class="btn sm primary" data-run="clip">${ic("scissors")} ${t("Uložit klip", "Save a clip")}</button><button class="btn sm" data-run="open_clips">${ic("folder")} ${t("Otevřít složku", "Open folder")}</button></span></div>
+    ${clipGrid()}
+  </div>
+  ${clipsSettingsCard()}`;
+}
+
+function tabObsLinks() {
+  return `<div class="head"><h1>${t("Do OBS", "To OBS")}</h1><p class="muted">${t("Co Assistent posílá do OBS: PNGtuber a odkazy, které ti pošlou pomocníci z webu.", "What the Assistent sends to OBS: the PNGtuber and links your editors send from the website.")}</p></div>
+  ${pngCard()}
+  ${remoteCard()}`;
+}
+
+// ---------------------------------------------------------------- vysílání a multistream
+const PLAT_COLOR = { kick: "#53fc18", twitch: "#9146ff", youtube: "#ff3b3b" };
+const multiCount = () => Object.values(S.multi.targets).filter((x) => x.on && x.hasKey).length;
+const platChips = () =>
+  Object.entries(S.multi.targets)
+    .filter(([, x]) => x.on && x.hasKey)
+    .map(([k, x]) => `<span class="pchip"><i style="background:${PLAT_COLOR[k]}"></i>${esc(x.name)}</span>`)
+    .join("");
+let upTest = { running: false, mbps: 0, kbps: 0, error: "" };
+let keyOpen = "";
+function tabStream() {
+  const m = S.multi;
+  const n = multiCount();
+  const kbps = upTest.kbps || 6000;
+  const need = Math.round(((kbps * Math.max(1, n)) / 1000) * 1.25 * 10) / 10; // 25 % rezerva
+  const have = upTest.mbps || (m.upload && m.upload.mbps) || 0;
+  const st = { off: t("vypnuto", "off"), ready: t("připraveno – čeká na stream z OBS", "ready – waiting for the stream from OBS"), live: t("vysílá na všechny platformy", "streaming to all platforms"), error: t("chyba", "error") }[m.state] || "";
+  const kickOn = m.targets.kick.on && n > 1;
+  return `<div class="head"><h1>${t("Vysílání a multistream", "Streaming & multistream")}</h1><p class="muted">${t("Kam a jak vysíláš. Zapni platformy, vlož klíče ke streamu a zbytek nastaví Assistent v OBS sám.", "Where and how you stream. Turn on platforms, paste the stream keys and the Assistent sets up OBS for you.")}</p></div>
+  <div class="modes">
+    <div class="mopt on"><span class="mst act">${t("POUŽÍVÁŠ", "IN USE")}</span><b>${t("Z tvého PC", "From your PC")}</b><p class="muted small">${t("Zdarma. Assistent pošle stejné video na každou zapnutou platformu – potřebuješ upload na všechny najednou.", "Free. The Assistent sends the same video to each platform you turn on – you need upload for all of them at once.")}</p></div>
+    <div class="mopt prem"><span class="mst soon">${ic("crown")} Premium · ${t("připravujeme", "coming soon")}</span><b>${t("Přes TejBot server", "Through the TejBot server")}</b><p class="muted small">${t("Pošleš jeden přenos a server ho rozešle všude, stačí upload na jednu platformu. S Premium se přepne samo, nic nezadáváš znovu.", "You send one stream and the server sends it everywhere, upload for one platform is enough. It switches on its own with Premium, nothing to set up again.")}</p></div>
+  </div>
+  <div class="card ${m.enabled ? "glow" : ""}">
+    <div class="row sp"><h2 style="margin:0">${chip("radio")}Multistream <span class="tag ${m.state === "live" ? "ok" : ""}"><span class="dot ${m.state === "live" ? "live" : m.state === "ready" ? "ok" : m.state === "error" ? "bad" : ""}"></span>${st}</span></h2>
+      <label class="switch"><input type="checkbox" id="multion" ${m.enabled ? "checked" : ""} ${m.ffmpeg ? "" : "disabled"} /><span></span></label></div>
+    ${m.ffmpeg ? "" : `<div class="note">${ic("alert")}<span>${t("V téhle verzi aplikace chybí součást pro multistream. Aktualizuj aplikaci.", "This version of the app is missing the multistream component. Update the app.")}</span></div>`}
+    ${m.state === "error" && m.detail ? `<div class="note">${ic("alert")}<span>${esc(m.detail)}</span></div>` : ""}
+    <p class="muted small" style="margin-top:6px">${m.enabled ? t("OBS teď posílá stream do Assistenta a ten ho rozesílá. Po vypnutí se OBS vrátí původní nastavení. Změny se projeví u dalšího streamu.", "OBS now sends the stream to the Assistent, which sends it on. Turning it off restores your original OBS settings. Changes apply to your next stream.") : t("Zapni a vyber platformy níže. Původní nastavení streamu v OBS si Assistent zapamatuje a po vypnutí ho vrátí.", "Turn it on and pick platforms below. The Assistent remembers your OBS stream settings and restores them when you turn it off.")}</p>
+    <h3 style="margin-top:16px">${t("Kam vysílat", "Where to stream")}</h3>
+    ${Object.entries(m.targets)
+      .map(
+        ([k, x]) => `<div class="plat">
+      <span class="plg" style="background:${PLAT_COLOR[k]}">${esc(x.name.slice(0, 1))}</span>
+      <span class="pnm"><b>${esc(x.name)}</b>${(m.failed || []).includes(k) ? `<span class="bad">${t("Nepodařilo se připojit – zkontroluj klíč ke streamu. Ostatní platformy jedou dál.", "Couldn't connect – check the stream key. The other platforms keep going.")}</span>` : x.hasKey ? `<span class="okt">${ic("check")} ${t("klíč ke streamu uložený", "stream key saved")}</span>` : `<span class="muted small">${t("vlož klíč ke streamu", "paste the stream key")}</span>`}</span>
+      <button class="btn sm ghost" data-keyopen="${k}">${x.hasKey ? t("Změnit klíč", "Change key") : t("Vložit klíč", "Add key")}</button>
+      <label class="switch"><input type="checkbox" data-plat="${k}" ${x.on ? "checked" : ""} ${x.hasKey ? "" : "disabled"} /><span></span></label>
+    </div>
+    ${
+      keyOpen === k
+        ? `<div class="keybox">
+      <label class="f">${t("Klíč ke streamu", "Stream key")} – ${esc(x.name)}</label>
+      <div class="row"><input type="password" id="key-${k}" placeholder="${x.hasKey ? t("uložený (vlož nový pro změnu)", "saved (paste a new one to change)") : ""}" style="flex:1" /><button class="btn primary sm" data-keysave="${k}">${t("Uložit", "Save")}</button>${x.hasKey ? `<button class="btn sm danger" data-keyclear="${k}">${t("Smazat", "Delete")}</button>` : ""}</div>
+      <p class="muted small" style="margin-top:6px">${{ kick: t("Kick: Nastavení kreátora › Stream URL a klíč (Stream Key).", "Kick: Creator settings › Stream URL & Key."), twitch: t("Twitch: Panel pro tvůrce › Nastavení › Stream › Primární klíč streamu.", "Twitch: Creator Dashboard › Settings › Stream › Primary Stream key."), youtube: t("YouTube: YouTube Studio › Vysílat živě › Klíč streamu.", "YouTube: YouTube Studio › Go live › Stream key.") }[k]} ${t("Klíč zůstane zašifrovaný jen v tomhle počítači.", "The key stays encrypted on this computer only.")}</p>
+      <details class="more" style="margin-top:6px"><summary>${t("Jiný server (pokročilé)", "Different server (advanced)")}</summary><input type="text" id="srv-${k}" value="${esc(x.server)}" placeholder="${esc(x.defaultServer)}" style="margin-top:6px" /></details>
+    </div>`
+        : ""
+    }`
+      )
+      .join("")}
+  </div>
+  <div class="card">
+    <div class="row sp"><h2 style="margin:0">${chip("gauge")}${t("Test uploadu", "Upload test")}</h2><button class="btn sm" id="uptest" ${upTest.running ? "disabled" : ""}>${upTest.running ? t("Měřím…", "Measuring…") : t("Změřit", "Measure")}</button></div>
+    <div class="meter" style="margin-top:12px"><div style="width:${have ? Math.min(100, (have / Math.max(need * 1.6, 1)) * 100) : 0}%"></div></div>
+    <div class="row sp small"><span class="muted">${t("Potřebuješ", "You need")}: ${(kbps / 1000).toFixed(1)} Mb/s × ${Math.max(1, n)} = <b>${need} Mb/s</b> ${t("(s rezervou)", "(with headroom)")}</span><span>${have ? (have >= need ? `<span class="okt">${ic("check")} ${t("Tvůj upload", "Your upload")} ${have} Mb/s ${t("stačí", "is enough")}</span>` : `<span class="bad">${t("Tvůj upload", "Your upload")} ${have} Mb/s ${t("nestačí – vypni některou platformu nebo sniž datový tok v OBS", "isn't enough – turn off a platform or lower the bitrate in OBS")}</span>`) : `<span class="muted">${t("ještě neměřeno", "not measured yet")}</span>`}</span></div>
+    ${upTest.error ? `<p class="error" style="margin-top:6px">${esc(upTest.error)}</p>` : ""}
+  </div>
+  ${kickOn ? `<div class="note warnbox">${ic("alert")}<span><b>${t("Kick partneři:", "Kick partners:")}</b> ${t("multistream musíš zapnout i u sebe na Kicku (nastavení kreátora). Kick za dobu souběžného vysílání krátí výplatu partnerům.", "you must also turn on multistreaming on Kick (creator settings). Kick reduces partner payouts while you stream elsewhere at the same time.")}</span></div>` : ""}
+  ${n > 1 && m.targets.twitch.on ? `<p class="muted small" style="margin:0 0 14px">${ic("info")} ${t("Twitch chce, aby stream u něj měl stejnou nebo lepší kvalitu než jinde – posíláme všude stejné video, takže je to splněné.", "Twitch requires its stream to be the same or better quality than elsewhere – we send the same video everywhere, so that's met.")}</p>` : ""}
+  ${goliveCard()}`;
+}
+
+// ---------------------------------------------------------------- zkratky a hlas (jedna stránka, dvě záložky)
+let csub = "hotkeys";
+function tabControls() {
+  const seg = [
+    ["hotkeys", "keyboard", t("Klávesové zkratky", "Hotkeys")],
+    ["voice", "wave", `${t("Hlasové povely", "Voice commands")}${PREM() ? "" : ` ${ic("crown")}`}`],
+  ];
+  const body = csub === "voice" ? (PREM() ? tabVoice() : lockedTab("voice")) : tabCmds();
+  return `<div class="seg" style="margin-bottom:16px">${seg.map(([k, i, n]) => `<button data-csub="${k}" class="${k === csub ? "on" : ""}">${ic(i)}${n}</button>`).join("")}</div>${body}`;
 }
 
 function voiceLabel() {
@@ -397,7 +504,7 @@ function tabVoice() {
   const [dot, label] = voiceLabel();
   const withPhrase = S.config.commands.filter((x) => x.phrase);
   const fresh = v.heard && Date.now() - v.heardAt < 60000;
-  return `<div class="head"><h1>${t("Hlasové povely", "Voice commands")}</h1><p class="muted">${t("Řekneš větu a aplikace udělá akci. Rozpoznávání běží jen v tvém počítači, hlas se nikam neposílá.", "Say a phrase and the app does the action. Recognition runs on your computer only; your voice is never sent anywhere.")}</p></div>
+  return `<div class="head"><h1>${t("Zkratky a hlas", "Hotkeys & voice")}</h1><p class="muted">${t("Řekneš větu a aplikace udělá akci. Rozpoznávání běží jen v tvém počítači, hlas se nikam neposílá.", "Say a phrase and the app does the action. Recognition runs on your computer only; your voice is never sent anywhere.")}</p></div>
   <div class="card ${c.enabled && v.status === "listening" ? "glow" : ""}">
     <h2>${chip("wave")}${t("Poslouchání", "Listening")}<span class="tag ${dot === "ok" ? "ok" : ""}"><span class="dot ${dot}"></span>${dot === "ok" ? t("běží", "on") : c.enabled ? t("připravuji", "starting") : t("vypnuto", "off")}</span></h2>
     <label class="check"><input type="checkbox" id="voiceon" ${c.enabled ? "checked" : ""} /><span><b>${t("Poslouchat hlasové povely", "Listen for voice commands")}</b></span></label>
@@ -439,11 +546,11 @@ function tabVoice() {
     ${fresh && v.log[0] ? `<ul class="clips">${heardRow(v.log[0])}</ul>` : `<p class="muted">${t("Zatím nic. Zkus říct některou větu níže.", "Nothing yet. Try saying one of the phrases below.")}</p>`}
   </div>
   <div class="card">
-    <div class="row sp" style="margin-bottom:12px"><h2 style="margin:0">${chip("keyboard")}${t("Věty, na které slyší", "Phrases it listens for")}</h2><button class="btn sm" data-tab="cmds">${t("Upravit v Příkazech", "Edit in Commands")} ›</button></div>
+    <div class="row sp" style="margin-bottom:12px"><h2 style="margin:0">${chip("keyboard")}${t("Věty, na které slyší", "Phrases it listens for")}</h2><button class="btn sm" data-csub="hotkeys">${t("Upravit u zkratek", "Edit in Hotkeys")} ›</button></div>
     ${
       withPhrase.length
         ? `<ul class="clips">${withPhrase.map((x) => `<li><span><b>„${S.config.voice.wake === false ? "" : `${wakeName()} `}${esc(x.phrase)}“</b></span><span class="muted small">${esc(t((S.actions.find((a) => a.key === x.action) || {}).cs || "", (S.actions.find((a) => a.key === x.action) || {}).en || ""))}${x.param ? `: ${esc(x.param)}` : ""}</span></li>`).join("")}</ul>`
-        : `<p class="muted">${t("Žádná. V části Příkazy a zkratky doplň u příkazu „Větu pro hlas“.", "None. Add a “Voice phrase” to a command under Commands & hotkeys.")}</p>`
+        : `<p class="muted">${t("Žádná. Na záložce Klávesové zkratky doplň u příkazu „Větu pro hlas“.", "None. Add a “Voice phrase” to a command in the Hotkeys tab.")}</p>`
     }
     ${similarPhrases().map(([a, b]) => `<div class="note">${ic("alert")}<span>${t(`Povely „${esc(a)}“ a „${esc(b)}“ znějí skoro stejně a budou se plést. Jeden z nich přepiš jinými slovy.`, `The commands “${esc(a)}” and “${esc(b)}” sound almost the same and will get mixed up. Reword one of them.`)}</span></div>`).join("")}
     ${v.unknown.length ? `<div class="note">${ic("alert")}<span>${t("Tahle slova hlasový model nezná, věta s nimi nebude fungovat. Zkus jiné slovo:", "The voice model doesn't know these words, so phrases with them won't work. Try another word:")} <b>${v.unknown.map(esc).join(", ")}</b></span></div>` : ""}
@@ -510,7 +617,7 @@ function micInput() {
   </div>`;
 }
 function tabMic() {
-  const head = `<div class="head"><h1>${t("Zvuk mikrofonu", "Microphone sound")}</h1><p class="muted">${t("Presety zvuku mikrofonu. Aplikace je nastaví jako filtry přímo v OBS, takže platí pro stream i nahrávky a fungují i s vypnutou aplikací.", "Microphone sound presets. The app sets them as filters right in OBS, so they apply to your stream and recordings and keep working with the app closed.")}</p></div>`;
+  const head = `<div class="head"><h1>${t("Mikrofon", "Microphone")}</h1><p class="muted">${t("Presety zvuku mikrofonu. Aplikace je nastaví jako filtry přímo v OBS, takže platí pro stream i nahrávky a fungují i s vypnutou aplikací.", "Microphone sound presets. The app sets them as filters right in OBS, so they apply to your stream and recordings and keep working with the app closed.")}</p></div>`;
   if (!M) return `${head}${micInput()}<div class="card"><p class="muted">${t("Načítám…", "Loading…")}</p></div>`;
   if (!M.ready) return `${head}${micInput()}<div class="card warnc"><div class="note" style="margin-top:0">${ic("alert")}<span>${esc(M.error)}</span></div><div style="margin-top:12px"><button class="btn sm" id="micreload">${ic("refresh")} ${t("Zkusit znovu", "Try again")}</button></div></div>`;
   const state = M.applied ? (M.bypass ? ["warn", t("Preset je v OBS, ale teď je vypnutý (porovnání)", "The preset is in OBS but currently off (comparison)")] : ["ok", t("Preset je v OBS zapnutý", "The preset is on in OBS")]) : ["", t("V OBS zatím žádný preset není", "No preset in OBS yet")];
@@ -636,7 +743,8 @@ function tabMusic() {
 }
 
 function tabSettings() {
-  return `<div class="head"><h1>${t("Nastavení", "Settings")}</h1><p class="muted">${t("Spouštění, jazyk, aktualizace a propojení s kanálem. Složku s klipy najdeš v OBS a klipy.", "Startup, language, updates and the channel link. The clips folder is under OBS & clips.")}</p></div>
+  return `<div class="head"><h1>${t("Nastavení a OBS", "Settings & OBS")}</h1><p class="muted">${t("Připojení k OBS, spouštění, jazyk, aktualizace a propojení s kanálem. Složku s klipy najdeš v Klipech.", "OBS connection, startup, language, updates and the channel link. The clips folder is under Clips.")}</p></div>
+  ${obsConnCard()}
   <div class="card">
     <h2>${chip("settings")}${t("Aplikace", "App")}</h2>
     <label class="check"><input type="checkbox" id="autostart" ${S.config.autostart ? "checked" : ""} /><span>${t("Spouštět po zapnutí počítače (schovaná u hodin)", "Start when the computer starts (hidden in the tray)")}</span></label>
@@ -679,7 +787,7 @@ function render() {
   if (S.web === "unpaired") return paint(screenPair()), bind();
   if (S.web === "offline" || S.web === "unknown") return paint(screenOffline()), bind();
   if (!S.config.setupDone) return paint(screenSetup()), bind();
-  const body = !PREM() && PREM_TABS.includes(tab) ? lockedTab(tab) : { home: tabHome, cmds: tabCmds, obs: tabObs, mic: tabMic, voice: tabVoice, music: tabMusic, settings: tabSettings }[tab]();
+  const body = !PREM() && PREM_TABS.includes(tab) ? lockedTab(tab) : ({ home: tabHome, stream: tabStream, clips: tabClips, obs: tabObsLinks, mic: tabMic, music: tabMusic, controls: tabControls, settings: tabSettings }[tab] || tabHome)();
   const ch = S.config.channel;
   // překreslení nesmí okno posunout nahoru (třeba po uložení)
   const prevMain = document.querySelector(".main");
@@ -690,7 +798,7 @@ function render() {
   paint(`<aside class="side">
     <div class="logo drag"><img src="icon.png" alt="" /><span>Tejbot Assistent<small>${PREM() ? "Premium" : t("Zdarma", "Free")}</small></span></div>
     <nav class="nav">${NAV()
-      .map(([g, items]) => `${g ? `<div class="grp">${esc(g)}</div>` : ""}${items.map(([k, i, n]) => `<button data-tab="${k}" class="${k === tab ? "on" : ""}">${ic(i)}<span>${n}</span>${!PREM() && PREM_TABS.includes(k) ? `<span class="navlock" title="Premium">${ic("crown")}</span>` : ""}${k === "obs" && !S.obs.connected ? `<span class="badge dot warn" title="${t("OBS není připojené", "OBS isn't connected")}"></span>` : ""}</button>`).join("")}`)
+      .map(([g, items]) => `${g ? `<div class="grp">${esc(g)}</div>` : ""}${items.map(([k, i, n]) => `<button data-tab="${k}" class="${k === tab ? "on" : ""}">${ic(i)}<span>${n}</span>${!PREM() && PREM_TABS.includes(k) ? `<span class="navlock" title="Premium">${ic("crown")}</span>` : ""}${k === "settings" && !S.obs.connected ? `<span class="badge dot warn" title="${t("OBS není připojené", "OBS isn't connected")}"></span>` : ""}</button>`).join("")}`)
       .join("")}</nav>
     <div class="foot">
       <div class="chan">${ch.avatar ? `<img src="${esc(ch.avatar)}" alt="" />` : `<span class="ava">${esc((ch.name || "?").slice(0, 1).toUpperCase())}</span>`}<span style="min-width:0"><span class="nm" style="display:block">${esc(ch.name)}</span>${PREM() ? `<span class="pr">${ic("crown")} PREMIUM</span>` : `<span class="pr free">${t("ZDARMA", "FREE")}</span>`}</span></div>
@@ -767,8 +875,14 @@ const apply = (s) => {
 
 async function openTab(k) {
   tab = k;
-  if (k === "cmds") cmds = S.config.commands.map((c) => ({ ...c }));
-  if (k === "cmds" || k === "obs" || k === "mic") lists = await tb.call("obsLists");
+  // staré názvy stránek (odkazy, zkratky) → nové
+  if (k === "cmds" || k === "voice") {
+    csub = k === "voice" ? "voice" : "hotkeys";
+    k = tab = "controls";
+  }
+  if (k === "controls") cmds = S.config.commands.map((c) => ({ ...c }));
+  if (k === "controls" || k === "obs" || k === "mic") lists = await tb.call("obsLists");
+  if (k === "stream" && !upTest.kbps) void tb.call("obsBitrate").then((kb) => ((upTest.kbps = kb), render()));
   if (k === "mic") {
     void loadMic();
     void loadPresets();
@@ -794,6 +908,42 @@ function keyName(e) {
 
 function bind() {
   on("[data-tab]", "click", (el) => openTab(el.dataset.tab));
+  on("[data-csub]", "click", (el) => {
+    csub = el.dataset.csub;
+    render();
+  });
+  // multistream
+  const multiSave = async (patch) => {
+    const r = await tb.call("multiSave", patch);
+    if (!r.ok) toast(r);
+    apply(r.state);
+  };
+  on("#multion", "change", (el) => multiSave({ enabled: el.checked }));
+  on("[data-plat]", "change", (el) => multiSave({ targets: { [el.dataset.plat]: { on: el.checked } } }));
+  on("[data-keyopen]", "click", (el) => {
+    keyOpen = keyOpen === el.dataset.keyopen ? "" : el.dataset.keyopen;
+    render();
+  });
+  on("[data-keysave]", "click", async (el) => {
+    const k = el.dataset.keysave;
+    const key = (document.getElementById(`key-${k}`) || {}).value || "";
+    const srv = document.getElementById(`srv-${k}`);
+    const had = S.multi.targets[k].hasKey;
+    keyOpen = "";
+    // nově vložený klíč platformu rovnou zapne
+    await multiSave({ targets: { [k]: { key, server: srv ? srv.value : undefined, ...(key.trim() && !had ? { on: true } : {}) } } });
+  });
+  on("[data-keyclear]", "click", async (el) => {
+    keyOpen = "";
+    await multiSave({ targets: { [el.dataset.keyclear]: { clear: true, on: false } } });
+  });
+  on("#uptest", "click", async () => {
+    upTest = { ...upTest, running: true, error: "" };
+    render();
+    const r = await tb.call("uploadTest");
+    upTest = r.ok ? { running: false, mbps: r.mbps, kbps: r.kbps, error: "" } : { ...upTest, running: false, error: r.message };
+    apply(r.state);
+  });
   on("[data-open]", "click", (el) => tb.call("openSite", el.dataset.open));
   on("[data-run]", "click", (el) => tb.call("run", el.dataset.run, ""));
   on("[data-show]", "click", (el) => tb.call("showClip", el.dataset.show));
@@ -1037,6 +1187,7 @@ async function openGoLive(opts) {
     <input type="text" id="gl-q" placeholder="${t("Hledat kategorii (třeba Just Chatting, Minecraft…)", "Search a category (e.g. Just Chatting, Minecraft…)")}" />
     <div id="gl-res" class="catlist"></div>
     ${rec.recent && rec.recent.length ? `<div class="recent"><span class="muted small">${t("Naposledy:", "Recent:")}</span>${rec.recent.map((c, i) => `<button class="btn sm" data-recent="${i}">${esc(c.name)}</button>`).join("")}</div>` : ""}
+    ${S.multi && S.multi.enabled && multiCount() ? `<label class="f" style="margin-top:12px">${t("Vysílat na", "Stream to")}</label><div class="pchips">${platChips()}</div><p class="muted small" style="margin-top:4px">${t("Multistream je zapnutý – stream půjde na všechny tyhle platformy. Změníš to ve Vysílání a multistreamu.", "Multistream is on – the stream goes to all these platforms. Change it under Streaming & multistream.")}</p>` : ""}
     <label class="check" style="margin-top:8px${live ? ";display:none" : ""}"><input type="checkbox" id="gl-rec" ${rec.record && !live ? "checked" : ""} /><span>${t("Spustit i nahrávání (záznam pro Trim editor)", "Start recording too (a recording for the Trim editor)")}</span></label>
     ${S.obs.connected || live ? "" : `<div class="note">${ic("alert")}<span>${t("OBS není připojené, stream teď nejde spustit.", "OBS isn't connected, the stream can't start now.")}</span></div>`}
     <div class="row" style="margin-top:16px;justify-content:flex-end"><button class="btn ghost" data-a="0">${t("Zrušit", "Cancel")}</button><button class="btn live" id="gl-go" ${S.obs.connected ? "" : "disabled"}>${live ? `${ic("check")} ${t("Uložit název a kategorii", "Save title and category")}` : `${ic("radio")} ${t("Začít vysílat", "Go live")}`}</button></div>
@@ -1148,10 +1299,51 @@ tb.on("state", async (s) => {
   const before = S;
   S = s;
   // OBS se právě připojilo -> načíst seznam mikrofonů a scén
-  if (before && !before.obs.connected && s.obs.connected && (tab === "obs" || tab === "cmds" || tab === "mic")) lists = await tb.call("obsLists");
+  if (before && !before.obs.connected && s.obs.connected && (tab === "obs" || tab === "controls" || tab === "mic")) lists = await tb.call("obsLists");
   // ať se rozepsané pole nepřekreslí pod rukama
   const typing = document.activeElement && ["INPUT", "SELECT"].includes(document.activeElement.tagName);
   const screenChanged = !before || before.web !== s.web || before.config.setupDone !== s.config.setupDone;
   if (screenChanged || !typing) render();
 });
 tb.call("state").then(apply);
+
+// ---------------------------------------------------------------- jemný kouř v pozadí (jen design)
+// Pár rozmazaných šedých obláčků pomalu pluje vzhůru. Když je okno schované, nekreslí se nic.
+(function smoke() {
+  const cv = document.getElementById("smoke");
+  if (!cv) return;
+  const cx = cv.getContext("2d");
+  let W = 0, H = 0;
+  const fit = () => {
+    W = cv.width = innerWidth;
+    H = cv.height = innerHeight;
+  };
+  fit();
+  addEventListener("resize", fit);
+  const still = matchMedia("(prefers-reduced-motion: reduce)").matches;
+  const puffs = Array.from({ length: 12 }, () => ({ x: Math.random(), y: 0.4 + Math.random() * 0.8, r: 140 + Math.random() * 240, vx: (Math.random() - 0.5) * 0.00002, vy: -0.000012 - Math.random() * 0.000015, a: 0.02 + Math.random() * 0.03, ph: Math.random() * 6 }));
+  let last = 0;
+  function frame(t) {
+    requestAnimationFrame(frame);
+    if (document.hidden || t - last < 50) return; // 20 snímků za vteřinu stačí
+    const dt = last ? t - last : 16;
+    last = t;
+    cx.clearRect(0, 0, W, H);
+    for (const p of puffs) {
+      if (!still) {
+        p.x += p.vx * dt;
+        p.y += p.vy * dt;
+        if (p.y < -0.3) (p.y = 1.25), (p.x = Math.random());
+      }
+      const a = p.a * (0.75 + 0.25 * Math.sin(t / 3500 + p.ph));
+      const g = cx.createRadialGradient(p.x * W, p.y * H, 0, p.x * W, p.y * H, p.r);
+      g.addColorStop(0, `rgba(205,209,218,${a})`);
+      g.addColorStop(1, "rgba(205,209,218,0)");
+      cx.fillStyle = g;
+      cx.beginPath();
+      cx.arc(p.x * W, p.y * H, p.r, 0, 7);
+      cx.fill();
+    }
+  }
+  requestAnimationFrame(frame);
+})();
