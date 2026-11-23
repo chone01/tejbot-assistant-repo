@@ -401,7 +401,8 @@ function tabStream() {
   const kbps = upTest.kbps || 6000;
   const need = Math.round(((kbps * Math.max(1, n)) / 1000) * 1.25 * 10) / 10; // 25 % rezerva
   const have = upTest.mbps || (m.upload && m.upload.mbps) || 0;
-  const st = { off: t("vypnuto", "off"), ready: t("připraveno – čeká na stream z OBS", "ready – waiting for the stream from OBS"), live: t("vysílá na všechny platformy", "streaming to all platforms"), error: t("chyba", "error") }[m.state] || "";
+  const one = m.mode === "direct";
+  const st = (m.pending ? t("změna se projeví po skončení streamu", "the change applies after the stream ends") : { off: t("vypnuto", "off"), ready: one ? t("připraveno – OBS vysílá rovnou na platformu", "ready – OBS streams straight to the platform") : t("připraveno – čeká na stream z OBS", "ready – waiting for the stream from OBS"), live: one ? t("vysílá", "live") : t("vysílá na všechny platformy", "streaming to all platforms"), error: t("chyba", "error") }[m.state]) || "";
   const kickOn = m.targets.kick.on && n > 1;
   return `<div class="head"><h1>${t("Vysílání a multistream", "Streaming & multistream")}</h1><p class="muted">${t("Kam a jak vysíláš. Zapni platformy, vlož klíče ke streamu a zbytek nastaví Assistent v OBS sám.", "Where and how you stream. Turn on platforms, paste the stream keys and the Assistent sets up OBS for you.")}</p></div>
   <div class="modes">

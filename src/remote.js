@@ -21,6 +21,12 @@ let onDone = () => {};
 let isPremium = () => false;
 const waiting = new Map(); // id -> { cmd, since } (čeká na připojení OBS)
 const handled = new Set();
+// vyřízené povely si pamatujeme jen posledních 500 (jinak by seznam rostl celé dny)
+const markHandled = (id) => {
+  markHandled(id);
+  if (handled.size > 500) handled.delete(handled.values().next().value);
+};
+let loop = 0; // číslo běhu dotazování (po stop/start nesmí běžet dva najednou)
 
 const isTejbot = (u) => {
   try {
@@ -81,12 +87,18 @@ async function handle(cmd) {
   const p = cmd.payload || {};
   // panel „Začít vysílat“ v OBS (tajný odkaz streamera) – bez ptaní
   if (cmd.kind === "go_live" || cmd.kind === "stop_stream") {
-    handled.add(cmd.id);
+    markHandled(cmd.id);
     if (!obs.state().connected) return report(cmd.id, "error", L("Tejbot Assistent není připojený k OBS.", "Tejbot Assistent isn't connected to OBS."));
     try {
       const st = await obs.call("GetStreamStatus");
       if (cmd.kind === "go_live") {
         if (!st.outputActive) {
+          // multistream: OBS ať míří na Assistenta a přeposílání poslouchá (stejně jako tlačítko v aplikaci)
+          const c = config.get();
+          if (c.multi && c.multi.enabled) {
+            await require("./multistream").sync().catch(() => {});
+            await new Promise((r) => setTimeout(r, 700));
+          }
           obs.markSelfStart();
           await obs.call("StartStream");
         }
@@ -100,7 +112,7 @@ async function handle(cmd) {
   }
   // povel z mobilního ovladače (scéna, mikrofon, nahrávání, klip) – stejné akce jako klávesové zkratky
   if (cmd.kind === "obs_action") {
-    handled.add(cmd.id);
+    markHandled(cmd.id);
     const actions = require("./actions");
     const action = String(p.action || "");
     if (!["clip", "scene", "mic_toggle", "record_toggle", "replay_toggle"].includes(action)) return report(cmd.id, "error", L("Neznámý povel.", "Unknown command."));
@@ -115,7 +127,7 @@ async function handle(cmd) {
       return;
     }
     waiting.delete(cmd.id);
-    handled.add(cmd.id);
+    markHandled(cmd.id);
     try {
       const msg = await buildScenes(p);
       await report(cmd.id, "done", msg.slice(0, 480));
@@ -129,11 +141,11 @@ async function handle(cmd) {
   }
   const mode = config.get().remote.mode;
   if (cmd.kind !== "add_source" || !/^https?:\/\//i.test(String(p.url || ""))) {
-    handled.add(cmd.id);
+    markHandled(cmd.id);
     return report(cmd.id, "error", "unknown");
   }
   if (mode === "off") {
-    handled.add(cmd.id);
+    markHandled(cmd.id);
     return report(cmd.id, "declined", L("Streamer má přijímání odkazů do OBS vypnuté.", "The streamer has turned off receiving OBS links."));
   }
   if (!obs.state().connected) {
@@ -145,22 +157,27 @@ async function handle(cmd) {
     return;
   }
   waiting.delete(cmd.id);
-  handled.add(cmd.id);
+  markHandled(cmd.id);
   const ask = mode === "ask" || !isTejbot(p.url);
-  if (ask && !(await asker(cmd))) return report(cmd.id, "declined", L("Streamer odkaz nepřidal.", "The streamer didn't add the link."));
-  try {
-    const msg = await addSource(p);
-    await report(cmd.id, "done", msg);
-    onDone({ ok: true, message: `${cmd.by_name ? `${cmd.by_name}: ` : ""}${p.name} – ${msg}` });
-  } catch (e) {
-    const msg = String((e && e.message) || e).slice(0, 280);
-    await report(cmd.id, "error", msg);
-    onDone({ ok: false, message: `${L("Odkaz do OBS se nepřidal", "The OBS link wasn't added")}: ${msg}` });
-  }
+  // dotaz na streamera čeká bokem (až 2 minuty) – ostatní povely (Začít vysílat, mobil) mezitím běží dál
+  const finish = async () => {
+    if (ask && !(await asker(cmd))) return report(cmd.id, "declined", L("Streamer odkaz nepřidal.", "The streamer didn't add the link."));
+    try {
+      const msg = await addSource(p);
+      await report(cmd.id, "done", msg);
+      onDone({ ok: true, message: `${cmd.by_name ? `${cmd.by_name}: ` : ""}${p.name} – ${msg}` });
+    } catch (e) {
+      const msg = String((e && e.message) || e).slice(0, 280);
+      await report(cmd.id, "error", msg);
+      onDone({ ok: false, message: `${L("Odkaz do OBS se nepřidal", "The OBS link wasn't added")}: ${msg}` });
+    }
+  };
+  if (ask) void finish();
+  else await finish();
 }
 
-async function poll() {
-  if (!running) return;
+async function poll(my) {
+  if (!running || my !== loop) return;
   try {
     const r = await api.commands();
     for (const c of (r.ok && r.data && r.data.list) || []) await handle(c);
@@ -171,11 +188,11 @@ async function poll() {
   for (const [id, w] of [...waiting]) {
     if (Date.now() - w.since > WAIT_OBS_MS) {
       waiting.delete(id);
-      handled.add(id);
+      markHandled(id);
       await report(id, "error", L("OBS nebylo připojené.", "OBS wasn't connected."));
     } else if (obs.state().connected) await handle(w.cmd);
   }
-  if (running) pollTimer = setTimeout(poll, obs.state().connected ? POLL_MS : POLL_IDLE_MS);
+  if (running && my === loop) pollTimer = setTimeout(() => poll(my), obs.state().connected ? POLL_MS : POLL_IDLE_MS);
 }
 
 /** Pošle webu scény (s malým zpožděním, OBS jich při změně hlásí víc najednou) */
@@ -205,10 +222,11 @@ module.exports = {
     if (running) return;
     running = true;
     reportScenes();
-    poll();
+    void poll(++loop);
   },
   stop() {
     running = false;
+    loop++;
     clearTimeout(pollTimer);
     clearTimeout(sceneTimer);
   },

@@ -69,27 +69,53 @@ const setIn = (o, p, v) => {
   parent[last] = v;
 };
 
+// původní nastavení streamu v OBS (obsahuje klíč ke streamu) -> ukládá se celé zašifrované
+const encJson = (v) => (v && canEncrypt() ? `enc:${safeStorage.encryptString(JSON.stringify(v)).toString("base64")}` : v);
+const decJson = (v) => {
+  if (typeof v !== "string") return v ?? null;
+  try {
+    return JSON.parse(dec(v)) ?? null;
+  } catch {
+    return null;
+  }
+};
+
 let cfg = null;
+
+const readJson = (f) => {
+  try {
+    return JSON.parse(fs.readFileSync(f, "utf8"));
+  } catch {
+    return null;
+  }
+};
 
 function load() {
   const d = DEFAULTS();
-  let saved = {};
-  try {
-    saved = JSON.parse(fs.readFileSync(file(), "utf8"));
-  } catch {
-    /* první spuštění */
-  }
+  // poškozený soubor (pád počítače při ukládání) -> záložní kopie, ať se nic neztratí
+  let saved = readJson(file()) ?? readJson(`${file()}.bak`) ?? {};
+  if (typeof saved !== "object" || Array.isArray(saved)) saved = {};
   cfg = { ...d, ...saved, voice: { ...d.voice, ...(saved.voice || {}) }, mic: { ...d.mic, ...(saved.mic || {}) }, obs: { ...d.obs, ...(saved.obs || {}) }, remote: { ...d.remote, ...(saved.remote || {}) }, png: { ...d.png, ...(saved.png || {}) }, golive: { ...d.golive, ...(saved.golive || {}) }, multi: { ...d.multi, ...(saved.multi || {}), targets: { kick: { ...d.multi.targets.kick, ...(((saved.multi || {}).targets || {}).kick || {}) }, twitch: { ...d.multi.targets.twitch, ...(((saved.multi || {}).targets || {}).twitch || {}) }, youtube: { ...d.multi.targets.youtube, ...(((saved.multi || {}).targets || {}).youtube || {}) } } }, music: { ...d.music, ...(saved.music || {}), sources: { ...d.music.sources, ...((saved.music || {}).sources || {}) } } };
   if (!Array.isArray(cfg.commands)) cfg.commands = d.commands;
   for (const p of SECRET) setIn(cfg, p, dec(getIn(cfg, p)));
+  cfg.multi.prevService = decJson(cfg.multi.prevService);
   return cfg;
 }
 
 function save() {
   const out = JSON.parse(JSON.stringify(cfg));
   for (const p of SECRET) setIn(out, p, enc(getIn(out, p)));
+  out.multi.prevService = encJson(out.multi.prevService);
   fs.mkdirSync(path.dirname(file()), { recursive: true });
-  fs.writeFileSync(file(), JSON.stringify(out, null, 2));
+  // bezpečné uložení: nejdřív do dočasného souboru, pak jedním krokem přepsat (a nechat si zálohu)
+  const tmp = `${file()}.tmp`;
+  fs.writeFileSync(tmp, JSON.stringify(out, null, 2));
+  try {
+    if (fs.existsSync(file())) fs.copyFileSync(file(), `${file()}.bak`);
+  } catch {
+    /* záloha není nutná */
+  }
+  fs.renameSync(tmp, file());
 }
 
 module.exports = { get: () => cfg || load(), load, save };

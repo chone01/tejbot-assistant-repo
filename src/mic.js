@@ -125,8 +125,10 @@ async function monitor(on) {
     // zapamatovat původní poslech (ať ho vypnutí vrátí přesně, jak byl), ale ne náš vlastní
     if (cur.monitorType !== "OBS_MONITORING_TYPE_MONITOR_AND_OUTPUT" || !cfg.mic.prevMonitor) cfg.mic.prevMonitor = cur.monitorType === "OBS_MONITORING_TYPE_MONITOR_AND_OUTPUT" ? "OBS_MONITORING_TYPE_NONE" : cur.monitorType;
     await obs.call("SetInputAudioMonitorType", { inputName: source, monitorType: "OBS_MONITORING_TYPE_MONITOR_AND_OUTPUT" });
+    cfg.mic.monitorSet = true; // poslech zapnula aplikace (Vrátit zpět ho pak vrátí)
   } else {
     await obs.call("SetInputAudioMonitorType", { inputName: source, monitorType: cfg.mic.prevMonitor || "OBS_MONITORING_TYPE_NONE" });
+    cfg.mic.monitorSet = false;
   }
   config.save();
   return { ok: true, message: on ? L("Poslech zapnutý. Vezmi si sluchátka, ať se zvuk nevrací do mikrofonu.", "Monitoring on. Use headphones so the sound doesn't feed back into the mic.") : L("Poslech vypnutý.", "Monitoring off.") };
@@ -138,8 +140,9 @@ async function revert() {
   const cfg = config.get();
   for (const f of (await listFilters(source)).filter(ours)) await obs.call("RemoveSourceFilter", { sourceName: source, filterName: f.filterName }).catch(() => {});
   for (const name of cfg.mic.disabled || []) await obs.call("SetSourceFilterEnabled", { sourceName: source, filterName: name, filterEnabled: true }).catch(() => {});
-  await obs.call("SetInputAudioMonitorType", { inputName: source, monitorType: cfg.mic.prevMonitor || "OBS_MONITORING_TYPE_NONE" }).catch(() => {});
-  cfg.mic = { ...cfg.mic, disabled: [] };
+  // poslech vracíme jen když ho zapnula aplikace (vlastní poslech streamera nevypínáme)
+  if (cfg.mic.monitorSet) await obs.call("SetInputAudioMonitorType", { inputName: source, monitorType: cfg.mic.prevMonitor || "OBS_MONITORING_TYPE_NONE" }).catch(() => {});
+  cfg.mic = { ...cfg.mic, disabled: [], monitorSet: false };
   config.save();
   return { ok: true, message: L("Vráceno. Mikrofon v OBS je jako před presetem.", "Reverted. The microphone in OBS is as it was before the preset.") };
 }

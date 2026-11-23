@@ -749,6 +749,11 @@ handle("uninstall", async () => {
   }
   globalShortcut.unregisterAll();
   media.stop();
+  // multistream: OBS nesmí zůstat nastavené na Assistenta, který tu po odinstalaci nebude
+  multi.stop();
+  multiRestored = true;
+  quitConfirmed = true;
+  await Promise.race([multi.restore(), new Promise((r) => setTimeout(r, 2000))]).catch(() => {});
   await obs.stop();
   const userData = app.getPath("userData");
   if (process.platform === "win32") {
@@ -874,7 +879,27 @@ app.on("window-all-closed", () => {
   /* běží dál u hodin */
 });
 let multiRestored = false;
+let quitConfirmed = false;
 app.on("before-quit", (e) => {
+  // vysílá se přes multistream: ukončení aplikace by stream shodilo -> nejdřív se zeptat
+  if (!quitConfirmed && multi.liveViaUs()) {
+    e.preventDefault();
+    quitting = false;
+    showWindow();
+    const n = dialog.showMessageBoxSync(win, {
+      type: "warning",
+      buttons: [L("Neukončovat", "Don't quit"), L("Ukončit a shodit stream", "Quit and drop the stream")],
+      defaultId: 0,
+      cancelId: 0,
+      title: "Tejbot Assistent",
+      message: L("Právě vysíláš přes multistream.", "You're streaming through multistream."),
+      detail: L("Když aplikaci ukončíš, stream na všech platformách skončí. Nejdřív ukonči vysílání.", "If you quit the app, the stream ends on every platform. End the stream first."),
+    });
+    if (n !== 1) return;
+    quitConfirmed = true;
+    setTimeout(() => app.quit(), 0);
+    return;
+  }
   quitting = true;
   stopVoice();
   media.stop();

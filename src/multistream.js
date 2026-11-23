@@ -23,7 +23,8 @@ const PLATFORMS = {
 let proc = null;
 let want = false; // má teď běžet přeposílání (multistream zapnutý a víc než jedna platforma)
 let restartTimer = null;
-let status = { state: "off", detail: "", live: false, mode: "pc", failed: [] };
+let status = { state: "off", detail: "", live: false, mode: "pc", failed: [], pending: false };
+let pending = false; // změna nastavení během streamu: projeví se až po jeho konci
 
 function ffmpegPath() {
   try {
@@ -46,8 +47,21 @@ const setStatus = (p) => {
  * Až bude server: když má streamer Premium a server je dostupný, vrátit { mode: "server", url, key }.
  */
 function relayTarget(/* premium */) {
+  // jen jedna platforma: OBS pošle stream rovnou na ni (přes počítač by to byla zbytečná zastávka navíc)
+  const t = targets();
+  if (t.length === 1) {
+    const [k, x] = t[0];
+    return { mode: "direct", url: String(x.server || PLATFORMS[k].server).replace(/\/+$/, ""), key: x.key };
+  }
   return { mode: "pc", url: LOCAL, key: LOCAL_KEY };
 }
+/** míří OBS teď na nás (Assistenta nebo přímo nastavenou platformu)? */
+const ourService = (cur) => {
+  const set = (cur && cur.streamServiceSettings) || {};
+  if (cur?.streamServiceType !== "rtmp_custom") return false;
+  if (set.server === LOCAL) return true;
+  return Object.entries(cfg().targets || {}).some(([k, t]) => PLATFORMS[k] && t && t.key && set.key === t.key);
+};
 
 // tee: ve výstupech se escapuje \ | [ ]
 const teeEsc = (s) => String(s).replace(/([\\|[\]])/g, "\\$1");
@@ -110,9 +124,11 @@ async function pointObs() {
   const c = cfg();
   const target = relayTarget();
   const cur = await obs.call("GetStreamServiceSettings");
-  const pointed = cur.streamServiceType === "rtmp_custom" && cur.streamServiceSettings && cur.streamServiceSettings.server === target.url;
-  if (!pointed) {
-    c.prevService = { type: cur.streamServiceType, settings: cur.streamServiceSettings };
+  const cs = cur.streamServiceSettings || {};
+  const exact = cur.streamServiceType === "rtmp_custom" && cs.server === target.url && cs.key === target.key;
+  if (!exact) {
+    // původní nastavení si pamatujeme jen jednou (ne naše vlastní, když se mění platformy)
+    if (!c.prevService && !ourService(cur)) c.prevService = { type: cur.streamServiceType, settings: cur.streamServiceSettings };
     config.save();
     await obs.call("SetStreamServiceSettings", { streamServiceType: "rtmp_custom", streamServiceSettings: { server: target.url, key: target.key, use_auth: false } });
   }
@@ -125,7 +141,7 @@ async function restoreObs() {
   if (!c.prevService) return;
   try {
     const cur = await obs.call("GetStreamServiceSettings");
-    if (cur.streamServiceType === "rtmp_custom" && cur.streamServiceSettings && cur.streamServiceSettings.server === LOCAL) {
+    if (ourService(cur)) {
       await obs.call("SetStreamServiceSettings", { streamServiceType: c.prevService.type, streamServiceSettings: c.prevService.settings });
     }
     c.prevService = null;
@@ -139,6 +155,14 @@ async function restoreObs() {
 async function sync() {
   const c = cfg();
   const on = !!c.enabled && targets().length >= 1;
+  // během streamu se nic nepřepojuje ani nevypíná (stream by spadl) – změny se projeví po jeho konci
+  if (obs.state().streaming) {
+    pending = true;
+    setStatus({ pending: true });
+    return;
+  }
+  pending = false;
+  setStatus({ pending: false });
   if (!on) {
     want = false;
     killRelay();
@@ -146,11 +170,11 @@ async function sync() {
     if (obs.state().connected && !obs.state().streaming) await restoreObs();
     return;
   }
-  // během streamu se nic nepřepojuje (stream by vypadl) – změny se projeví u dalšího streamu
-  if (obs.state().streaming && proc) return;
-  want = true;
+  const direct = targets().length === 1;
+  want = !direct;
   killRelay();
-  spawnRelay();
+  if (direct) setStatus({ state: "ready", detail: "", live: false, failed: [] });
+  else spawnRelay();
   if (obs.state().connected) {
     try {
       await pointObs();
@@ -233,15 +257,31 @@ function save(patch) {
 
 // OBS se právě připojilo → nastavit, ať posílá stream na Assistenta; stream skončil → stav „live“ dolů
 let wasConnected = false;
+let wasStreaming = false;
 obs.events.on("state", (st) => {
   const now = !!(st && st.connected);
-  if (now && !wasConnected && cfg().enabled && targets().length) {
-    want = true;
-    if (!proc) spawnRelay();
-    void pointObs().catch((e) => setStatus({ state: "error", detail: String((e && e.message) || e).slice(0, 200) }));
+  const streaming = !!(st && st.streaming);
+  if (now && !wasConnected) {
+    if (cfg().enabled && targets().length) {
+      const direct = targets().length === 1;
+      want = !direct;
+      if (direct) killRelay();
+      else if (!proc) spawnRelay();
+      void pointObs().catch((e) => setStatus({ state: "error", detail: String((e && e.message) || e).slice(0, 200) }));
+    } else if (cfg().prevService && !streaming) {
+      // multistream se vypnul, když OBS nebylo připojené -> vrátit OBS původní nastavení teď
+      void restoreObs();
+    }
   }
   wasConnected = now;
-  if (st && !st.streaming && status.live) setStatus({ state: proc ? "ready" : status.state, live: false });
+  // stav „vysílá“ podle OBS (ffmpeg při bezchybném běhu nic nevypisuje)
+  if (streaming && !status.live && (proc || status.mode === "direct") && cfg().enabled) setStatus({ state: "live", live: true });
+  if (!streaming && status.live) setStatus({ state: proc || status.mode === "direct" ? "ready" : status.state, live: false });
+  // stream skončil a během něj se měnilo nastavení -> teď ho použít
+  if (wasStreaming && !streaming && pending) void sync().catch(() => {});
+  wasStreaming = streaming;
 });
 
-module.exports = { events, PLATFORMS, view, save, sync, uploadTest, obsBitrate, restore: restoreObs, stop: () => ((want = false), killRelay()) };
+/** běží teď stream přes multistream? (ukončení aplikace by ho shodilo) */
+const liveViaUs = () => !!obs.state().streaming && (!!proc || status.mode === "direct") && !!cfg().enabled;
+module.exports = { events, PLATFORMS, view, save, sync, uploadTest, obsBitrate, liveViaUs, restore: restoreObs, stop: () => ((want = false), killRelay()) };
